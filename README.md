@@ -157,10 +157,12 @@ Set `NIKECHAN_X_WORKER_CANONICAL_MEMORY=disabled` for isolated local tests.
 - recent Nikechan X posts where available
 - public episodes, notes, wiki topics, articles
 - master public tweets as auxiliary context
-- tweet performance ranking
+- tweet performance ranking. If `nikechan/scripts/db.sh tweet-metrics-ranking` returns human-readable text instead of JSON, the worker keeps it as loaded text context instead of treating Phase B context as failed
 - recent `twitter_run_state` for planning only
 
 The worker still owns final guards. MCP tools cannot post to X, call Discord, or write canonical memory.
+
+Worker-local Hermes experience is passed to Hermes only as cooldown and learning context. It should not dominate tweet topics when public wiki, public episodes, articles, recent tweets, or master tweets are loaded.
 
 ## Hermes Native Skills
 
@@ -199,6 +201,8 @@ NIKECHAN_X_WORKER_HERMES_SKILL_SNAPSHOT_PATH=skills/hermes/nikechan-x-self-tweet
 ```
 
 Set `NIKECHAN_X_WORKER_HERMES_SKILL_AUTOCOMMIT=false` to disable git commits. The commit result is included in `WorkflowReport.audit.hermesSkill.snapshot`.
+
+Production deploy rebases `/opt/nikechan-x-worker` onto `origin/main`. If Hermes auto-committed skill snapshots on the VPS and the same rules were later committed upstream, duplicate snapshot commits may be skipped during conflict cleanup as long as their content is already present in `origin/main`.
 
 ## Discord revision loop
 

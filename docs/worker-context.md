@@ -28,6 +28,8 @@ Container startup has been verified in production. Hermes provider authenticatio
 
 Hermes memory is worker-local experience memory. It can remember operational lessons such as recent dry-run topics, failed patterns, and guard outcomes.
 
+For self-tweet generation, worker-local experience is cooldown and learning context. It should help Hermes detect repetition and operator feedback, but it should not become the primary tweet source when fresh Phase B context is available.
+
 Canonical memory remains owned by `nikechan-core` / Supabase. When this worker learns something that may belong there, it should return a `memoryProposal` instead of writing it directly.
 
 For self-tweet, this worker reads canonical memory only through the existing public read adapter in `nikechan/scripts/db.sh`. The base public commands are `public-episodes x`, `public-notes x`, `public-wiki x`, and `presence-digest-list generated`. Raw memory writes remain outside the worker boundary.
@@ -44,6 +46,8 @@ Hermes can be given a worker-local MCP server named `nikechan-x-worker`. The ser
 
 These tools are the intended Phase B bridge: Hermes gathers and reasons over X workflow context itself, while the worker shell still blocks external effects and xangi remains Discord manager.
 
+`read_self_tweet_context` should consider Phase B available when public wiki, public episodes, articles, recent tweets, or master tweets are loaded. Empty notes or text-formatted tweet metrics alone should not make Hermes conclude that fresh source context is unavailable.
+
 ## Skill growth
 
 The worker calls Hermes CLI with `hermes -z` by default. Hermes receives the request, public canonical memory, worker-local experience, MCP tools, and the preloaded Hermes skill `nikechan-x-self-tweet`; it is responsible for reasoning over that context.
@@ -53,6 +57,8 @@ Worker-local skill proposal/apply code is not part of the intended design. Long-
 The worker intentionally enables Hermes `skills` and `memory` toolsets alongside the `nikechan-x-worker` MCP toolset. In dry-run mode Hermes may patch only `nikechan-x-self-tweet` via `skill_manage` when feedback or weak drafts reveal a reusable lesson. This is the autonomous improvement path.
 
 When Hermes changes the native skill, the worker snapshots the skill into `skills/hermes/nikechan-x-self-tweet/SKILL.md` and can commit that snapshot in the worker repository. The native Hermes skill remains the runtime source; the repository snapshot is for review, deployment traceability, and rollback.
+
+If production Hermes snapshot commits conflict with an upstream commit that already contains the same skill rules, skip the duplicate VPS commits during deploy cleanup and keep `origin/main` as the canonical repository state.
 
 Set `NIKECHAN_X_WORKER_HERMES_MODE=local-fallback` only for local scaffold tests when Hermes is not installed. That mode does not exercise Hermes native memory, native skills, or the learning loop.
 
