@@ -71,14 +71,7 @@ export class HermesCliAgent implements HermesAgentRuntime {
 }
 
 function buildHermesPrompt(input: HermesDecisionInput): string {
-  const recent = input.memory.recallRecent('self-tweet', 12).map((entry) => ({
-    id: entry.id,
-    createdAt: entry.createdAt,
-    kind: entry.kind,
-    topic: entry.topic,
-    summary: entry.summary,
-    metadata: entry.metadata,
-  }));
+  const recent = input.memory.recallRecent('self-tweet', 12);
   const feedback = input.request.context?.feedback ?? null;
   const maxActions = clampMaxActions(input.request.constraints?.max_actions);
   return [
@@ -94,6 +87,8 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '- Prefer read_worker_experience and read_self_tweet_skill for local learning context.',
     '- Do not use terminal/file tools to inspect xangi internals when the MCP tools are available.',
     '- Treat twitter_run_state as operational planning context only; never quote raw operational records in tweetText.',
+    '- Treat worker-local recent experience as cooldown/learning context, not as the main tweet source.',
+    '- If any Phase B sections such as publicWiki, publicEpisodes, articles, recentTweets, or masterTweets are loaded, do not call Phase B context unavailable just because one section is empty or text-formatted.',
     '',
     'Autonomous improvement contract:',
     '- The user explicitly allows Hermes to improve tweet quality by updating its native skill.',
@@ -113,6 +108,8 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     `- Return exactly ${maxActions} candidate(s) in candidates.`,
     '- Every tweetText must be complete Japanese public-facing text, <= 280 characters.',
     '- Make candidates meaningfully different in angle, rhythm, and source use.',
+    '- At most one candidate may reuse a repeated worker-experience topic such as recovery paths, fallback handling, or "next steps after failure".',
+    '- At least one candidate should be grounded in public wiki, public episodes, articles, recent tweets, or master tweets rather than worker-local experience.',
     '',
     'Return exactly this JSON shape:',
     '{',
@@ -150,12 +147,42 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     'Canonical memory source refs:',
     JSON.stringify(input.canonicalMemory.sourceRefs, null, 2),
     '',
-    'Worker-local recent experience:',
-    JSON.stringify(recent, null, 2),
+    'Worker-local recent experience summary. Use this for cooldown and learning only; avoid copying topics or wording from it:',
+    JSON.stringify(summarizeWorkerExperience(recent), null, 2),
     '',
     'Operator feedback for this iteration:',
     JSON.stringify(feedback, null, 2),
   ].join('\n');
+}
+
+function summarizeWorkerExperience(entries: HermesExperience[]): Record<string, unknown> {
+  const topicCounts = new Map<string, number>();
+  const feedback: Array<Pick<HermesExperience, 'createdAt' | 'summary'>> = [];
+  for (const entry of entries) {
+    if (entry.topic) topicCounts.set(entry.topic, (topicCounts.get(entry.topic) ?? 0) + 1);
+    if (entry.kind === 'operator_feedback') {
+      feedback.push({
+        createdAt: entry.createdAt,
+        summary: entry.summary,
+      });
+    }
+  }
+  return {
+    entryCount: entries.length,
+    repeatedTopics: Array.from(topicCounts.entries())
+      .filter(([, count]) => count > 1)
+      .sort((a, b) => b[1] - a[1])
+      .map(([topic, count]) => ({ topic, count })),
+    recentTopics: entries
+      .filter((entry) => entry.kind !== 'operator_feedback')
+      .slice(0, 6)
+      .map((entry) => ({
+        createdAt: entry.createdAt,
+        kind: entry.kind,
+        topic: entry.topic,
+      })),
+    recentFeedback: feedback.slice(0, 4),
+  };
 }
 
 async function runHermesCli(prompt: string): Promise<string> {

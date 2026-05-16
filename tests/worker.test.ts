@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -287,6 +287,36 @@ describe('runWorkflow', () => {
     expect(context.sections.publicEpisodes.status).toBe('loaded');
     expect(JSON.stringify(context.sections.articles.data)).toContain('Agent memory design');
     expect(context.sourceBrief).toContain('今回の収集方針');
+  });
+
+  it('keeps text-formatted tweet metrics as loaded performance context', async () => {
+    const dbFixture = join(tempDir, 'db-text-metrics.sh');
+    writeFileSync(
+      dbFixture,
+      `#!/bin/bash
+set -euo pipefail
+case "\${1:-}" in
+  public-episodes) printf '%s\\n' '[]' ;;
+  public-notes) printf '%s\\n' '[]' ;;
+  public-wiki) printf '%s\\n' '[{"id":"wiki1","topic":"公開wiki","content":"公開wikiの要約","metadata":{"provenance":{"source_refs":[]}}}]' ;;
+  topics-get) printf '%s\\n' '[]' ;;
+  reading-unpushed-twitter) printf '%s\\n' '[]' ;;
+  tweet-metrics-ranking) printf '%s\\n' '📊 Top 8 by engagement_rate' ;;
+  *) printf '%s\\n' '[]' ;;
+esac
+`
+    );
+    chmodSync(dbFixture, 0o755);
+    process.env.NIKECHAN_DB_SH_PATH = dbFixture;
+
+    const context = await collectSelfTweetToolContext();
+
+    expect(context.sections.performanceContext.status).toBe('loaded');
+    expect(context.sections.performanceContext.data).toMatchObject({
+      format: 'text',
+      parseNote: 'db.sh command returned human-readable text instead of JSON',
+    });
+    expect(context.errors.some((error) => error.includes('tweet-metrics-ranking'))).toBe(false);
   });
 
   it('rotates self-tweet source mode from old xangi run-state semantics', () => {

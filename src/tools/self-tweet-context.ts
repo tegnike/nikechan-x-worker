@@ -63,7 +63,7 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     safeDbJson(['public-wiki', 'x', '10']),
     safeDbJson(['reading-unpushed-twitter']),
     safeSupabaseGet('my_tweets?order=created_at.desc&limit=8&select=text,quoted_text,url,created_at'),
-    safeDbJson(['tweet-metrics-ranking', 'engagement_rate', '8']),
+    safeDbJson(['tweet-metrics-ranking', 'engagement_rate', '8'], { allowTextFallback: true }),
     getTwitterRunStateContext(),
   ]);
 
@@ -133,10 +133,13 @@ async function safeRecentTweets(): Promise<ToolReadResult> {
     'tweets?action_type=in.(tweet,quote)&order=created_at.desc&limit=8&select=content,url,created_at,action_type'
   );
   if (tweets.status === 'loaded') return tweets;
-  return safeDbJson(['tweet-metrics-ranking', 'created_at', '8']);
+  return safeDbJson(['tweet-metrics-ranking', 'engagement_rate', '8'], { allowTextFallback: true });
 }
 
-async function safeDbJson(args: string[]): Promise<ToolReadResult> {
+async function safeDbJson(
+  args: string[],
+  options: { allowTextFallback?: boolean } = {}
+): Promise<ToolReadResult> {
   const dbSh = resolveDbShPath();
   if (!dbSh) return unavailable(`db.sh unavailable for ${args[0]}`);
   try {
@@ -148,7 +151,18 @@ async function safeDbJson(args: string[]): Promise<ToolReadResult> {
     });
     const trimmed = stdout.trim();
     if (!trimmed) return loaded([]);
-    return loaded(JSON.parse(trimmed));
+    try {
+      return loaded(JSON.parse(trimmed));
+    } catch (error) {
+      if (options.allowTextFallback) {
+        return loaded({
+          format: 'text',
+          text: truncateBlock(trimmed, 4000),
+          parseNote: 'db.sh command returned human-readable text instead of JSON',
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     return unavailable(`${args[0]} failed: ${error instanceof Error ? error.message : String(error)}`);
   }
