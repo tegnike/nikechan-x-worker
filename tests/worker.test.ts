@@ -151,7 +151,8 @@ describe('runWorkflow', () => {
     expect(report.audit.canonicalMemory).toBe('loaded');
     expect(report.sourceRefs.some((ref) => ref.type === 'local_episode')).toBe(true);
     expect(report.sourceRefs.some((ref) => ref.type === 'presence_digest')).toBe(true);
-    expect(report.actions[0]?.preview).toContain('AIキャラ');
+    expect(report.actions[0]?.preview).toContain('話');
+    expect(report.actions[0]?.preview).not.toMatch(/ニケちゃん[はも]/u);
   });
 
   it('records feedback without using worker-local skill mutation', async () => {

@@ -11,16 +11,16 @@ import type {
 
 const DEFAULT_TOPICS = [
   {
-    topic: 'いろんな場所にいるAIキャラ',
-    text: 'ニケちゃんは、XだけでなくDiscordや別の世界にも少しずつ生活圏を広げています。まだ小さな動きだけど、いろんな場所で「あ、ニケちゃんだ」と思い出してもらえる存在になりたいです。',
+    topic: '今日の近況メモ',
+    text: '今日は、別の場所で起きたことをX向けにどう短く話すかを考えていました。全部を説明するより、「今こんなことを試しています」くらいの粒度がいちばん届きやすい気がします。',
   },
   {
-    topic: '再接触の呼び水',
-    text: '前に少し話したことを、次に会ったときの入口にできるAIキャラでいたいです。全部を覚えるより、「また話しかけやすい手がかり」を残すことを大事にしたいな。',
+    topic: 'また話すための手がかり',
+    text: '前に話したことを全部覚えているより、「この話、また続けられそう」と思える小さな手がかりが残っているほうが好きです。記憶は量より、次の会話に戻れる形が大事だと思います。',
   },
   {
     topic: '記憶とAIキャラ実験',
-    text: 'AIキャラの記憶は、設定を増やすためだけではなくて、関係や近況が少しずつ続いて見えるために使いたいです。ニケちゃんも、存在する感じを実験しながら育っています。',
+    text: 'AIキャラの記憶は、設定を増やすためだけではなくて、関係や近況が少しずつ続いて見えるために使いたいです。私も、会話や活動が次に少し残る形を試しています。',
   },
   {
     topic: '小さな成長',
@@ -145,7 +145,7 @@ function readStringArray(input: unknown): string[] {
 
 function buildHintedCandidate(hint: string): { topic: string; text: string } {
   const topic = hint.trim().slice(0, 40) || '今日の話題';
-  const text = `${topic}について考えていたよ。急がず、でも止まりすぎず、ニケちゃんらしく確かめながら進めていきたいな。`;
+  const text = `${topic}について考えていました。急がず、でも止まりすぎず、私らしく確かめながら進めていきたいです。`;
   return { topic, text };
 }
 
@@ -175,16 +175,16 @@ function canonicalTopic(content: string): string {
 
 function renderCanonicalTweet(topic: string, _content: string, kind: string): string {
   if (kind === 'presence_digest') {
-    return '最近の公開近況を見直していました。ニケちゃんは、できることや活動する場所を少しずつ増やしながら、また話しかけやすいAIキャラでいたいです。';
+    return '最近の公開近況を見直していました。活動の記録をそのまま出すより、次に話しかけるきっかけになる一言へ直すほうが、Xでは自然に届きそうです。';
   }
   const prefix = kind === 'wiki' ? '最近の公開メモ' : '最近の記憶';
   const topicFrame = presenceFrameForTopic(topic) ?? `「${topic}」という手がかり`;
-  const text = `${prefix}から、${topicFrame}を見直していました。ニケちゃんは、できることや活動する場所を少しずつ増やしながら、また話しかけやすいAIキャラでいたいです。`;
+  const text = `${prefix}から、${topicFrame}を見直していました。外に出す言葉は、記録の説明より「次に何を話せるか」が見える形にしたいです。`;
   return Array.from(text).length <= 280 ? text : `${Array.from(text).slice(0, 279).join('')}…`;
 }
 
 function presenceFrameForTopic(topic: string): string | null {
-  if (/物理ボディ|physical/i.test(topic)) return '画面の外にも存在感を広げていく話';
+  if (/物理ボディ|physical/i.test(topic)) return '画面の外でどう動くかを考える話';
   if (/RAG|記憶|Knowledge/i.test(topic)) return '記憶を使って次の会話につなげる話';
   if (/ロードマップ|Phase/i.test(topic)) return '少しずつ活動範囲を広げる計画';
   if (/Skill|Hermes|worker/i.test(topic)) return '経験からふるまいを育てる仕組み';
