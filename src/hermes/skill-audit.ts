@@ -17,7 +17,7 @@ export function readHermesSelfTweetSkillSnapshot(): HermesSkillSnapshot {
   const name = readHermesSelfTweetSkillName();
   const path =
     process.env.NIKECHAN_X_WORKER_HERMES_SKILL_PATH ??
-    resolve(homedir(), '.hermes', 'skills', name, 'SKILL.md');
+    resolve(readHermesHome(), 'skills', name, 'SKILL.md');
   try {
     const content = readFileSync(path);
     const stats = statSync(path);
@@ -92,4 +92,8 @@ function normalizeDiffLine(line: string): string {
 function readHermesSelfTweetSkillName(): string {
   const skills = process.env.NIKECHAN_X_WORKER_HERMES_SKILLS ?? 'nikechan-x-self-tweet';
   return skills.split(',')[0]?.trim() || 'nikechan-x-self-tweet';
+}
+
+function readHermesHome(): string {
+  return process.env.HERMES_HOME?.trim() || resolve(homedir(), '.hermes');
 }

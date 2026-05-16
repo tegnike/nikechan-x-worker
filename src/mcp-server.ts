@@ -119,7 +119,7 @@ function jsonText(value: unknown) {
 function readHermesSelfTweetSkill() {
   const skillName = process.env.NIKECHAN_X_WORKER_HERMES_SKILLS ?? 'nikechan-x-self-tweet';
   const firstSkill = skillName.split(',')[0]?.trim() || 'nikechan-x-self-tweet';
-  const path = resolve(homedir(), '.hermes', 'skills', firstSkill, 'SKILL.md');
+  const path = resolve(readHermesHome(), 'skills', firstSkill, 'SKILL.md');
   if (!existsSync(path)) {
     return {
       status: 'unavailable',
@@ -134,6 +134,10 @@ function readHermesSelfTweetSkill() {
     path,
     content: readFileSync(path, 'utf-8'),
   };
+}
+
+function readHermesHome(): string {
+  return process.env.HERMES_HOME?.trim() || resolve(homedir(), '.hermes');
 }
 
 await server.connect(new StdioServerTransport());

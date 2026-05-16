@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chooseSourceMode, collectSelfTweetToolContext } from '../src/tools/self-tweet-context.js';
 import { runWorkflow } from '../src/worker.js';
@@ -17,6 +17,7 @@ const ENV_KEYS = [
   'NIKECHAN_X_WORKER_SELF_TWEET_SKILL_PATH',
   'NIKECHAN_X_WORKER_HERMES_MODE',
   'NIKECHAN_X_WORKER_HERMES_COMMAND',
+  'HERMES_HOME',
   'NIKECHAN_X_WORKER_HERMES_SKILL_PATH',
   'NIKECHAN_X_WORKER_HERMES_SKILL_AUTOCOMMIT',
   'NIKECHAN_X_WORKER_REPO_PATH',
@@ -42,6 +43,7 @@ beforeEach(() => {
   delete process.env.NIKECHAN_X_WORKER_HERMES_SKILL_SNAPSHOT_PATH;
   delete process.env.NIKECHAN_X_WORKER_FIXTURE_MUTATE_SKILL;
   delete process.env.NIKECHAN_X_WORKER_HERMES_COMMAND;
+  delete process.env.HERMES_HOME;
   process.env.NIKECHAN_X_WORKER_KILL_SWITCH = 'open';
   process.env.NIKECHAN_X_WORKER_X_KILL_SWITCH = 'open';
   process.env.NIKECHAN_X_WORKER_CANONICAL_MEMORY = 'disabled';
@@ -193,6 +195,26 @@ describe('runWorkflow', () => {
     expect(report.audit.hermesSkill?.addedLines).toContain('- fixture learned a reusable self-tweet rule');
     expect(report.audit.hermesSkill?.snapshot?.status).toBe('skipped');
     expect(report.actions[0]?.preview).toBe('Hermes本体の判断で、今日は安全に小さく試すところから始めるよ。');
+  });
+
+  it('uses HERMES_HOME for native Hermes skill audit when no explicit skill path is set', async () => {
+    const hermesHome = join(tempDir, 'hermes-home');
+    const skillPath = join(hermesHome, 'skills', 'nikechan-x-self-tweet', 'SKILL.md');
+    delete process.env.NIKECHAN_X_WORKER_HERMES_SKILL_PATH;
+    process.env.HERMES_HOME = hermesHome;
+    mkdirSync(dirname(skillPath), { recursive: true });
+    writeFileSync(skillPath, '---\nname: nikechan-x-self-tweet\n---\n# Skill\n');
+
+    const report = await runWorkflow({
+      workflow: 'self-tweet',
+      surface: 'x',
+      mode: 'dry-run',
+      requested_by: 'xangi',
+      correlation_id: 'hermes-home-skill',
+    });
+
+    expect(report.audit.hermesSkill?.status).toBe('unchanged');
+    expect(report.audit.hermesSkill?.path).toBe(skillPath);
   });
 
   it('commits a Hermes skill snapshot when native skill changes and autocommit is enabled', async () => {
