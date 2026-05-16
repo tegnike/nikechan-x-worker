@@ -27,6 +27,7 @@ Use this skill when Hermes is asked to generate self-tweet candidates for `nikec
 - Return complete Japanese public-facing tweet text, no more than 280 characters.
 - Do not call X/Twitter APIs.
 - If daily-life or presence memory is used, connect it to one specific making/coding/agent-design observation instead of ending as a general life metaphor.
+- If operator feedback says the source anecdote is hard to understand, remove niche scene details (for example specific shopping or bakery references) and restate the idea directly as an implementation observation.
 - Keep the wording readable as a natural X post; do not stack technical nouns just to signal competence.
 - When using daily-life material, focus on a single concrete development observation per candidate.
 - Prefer implementation-facing observations about memory layout, branch conditions, response stability, or agent design over abstract mindset lessons.
