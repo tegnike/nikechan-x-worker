@@ -13,9 +13,10 @@ RUN apt-get update && apt-get install -y \
 COPY docker-entrypoint.sh /usr/local/bin/nikechan-x-worker-entrypoint
 RUN chmod +x /usr/local/bin/nikechan-x-worker-entrypoint
 
-USER node
+USER root
 WORKDIR /worker
 
+ENV HERMES_HOME=/home/node/.hermes
 ENV NIKECHAN_X_WORKER_HOST=0.0.0.0
 ENV NIKECHAN_X_WORKER_PORT=8787
 
