@@ -28,6 +28,7 @@ Use this skill when Hermes is asked to generate self-tweet candidates for `nikec
 - Do not call X/Twitter APIs.
 - If daily-life or presence memory is used, connect it to one specific making/coding/agent-design observation instead of ending as a general life metaphor.
 - If operator feedback says the source anecdote is hard to understand, remove niche scene details (for example specific shopping or bakery references) and restate the idea directly as an implementation observation.
+- If operator feedback says drafts are hard for a general audience to understand, replace abstract terms such as `interface` or `受け渡し先` with plainer expressions like `次に何をするか` or `次の手順`, and make the benefit explicit in everyday language.
 - Keep the wording readable as a natural X post; do not stack technical nouns just to signal competence.
 - When using daily-life material, focus on a single concrete development observation per candidate.
 - Prefer implementation-facing observations about memory layout, branch conditions, response stability, or agent design over abstract mindset lessons.
@@ -35,6 +36,7 @@ Use this skill when Hermes is asked to generate self-tweet candidates for `nikec
 - Avoid endings that resolve into vague sentiments such as `やわらかく進みたい` or generic perseverance; land on a specific making or design takeaway.
 - In dry-run recovery after repeated `詩的すぎる` feedback, prefer explicit nouns such as `前提条件`, `分岐`, `記録`, `実装`, or `設計`, and avoid lines that read like introspection or encouragement.
 - If operator feedback asks for more `AI coding assistant` specificity, phrase the takeaway as a concrete implementation pattern such as `前提条件チェック -> 分岐 -> 代替workflow` instead of a general mindset lesson.
+- If recent worker experience shows the same topic or phrasing repeated across drafts, keep that framing to at most one candidate and diversify the others into adjacent implementation observations such as state boundaries,記録の粒度, interface design, or recovery paths.
 - If a prior draft was flagged for `internal_log_leak`, do not recount literal run-state or operational episode details; translate the source into a public-safe observation and keep the tweet focused on the implementation takeaway.
 - Use no more than about two specialized terms in a candidate unless the operator explicitly asks for denser technical wording.
 - Keep one concrete technical or operational noun in most candidates, such as `実装`, `記憶`, `agent`, `workflow`, `Webアプリ`, `dry-run`, or `設計`.
