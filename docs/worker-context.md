@@ -15,6 +15,15 @@ The first supported workflow is `self-tweet` in `dry-run` mode only.
 
 It returns one tweet candidate as a proposed `post_tweet` action. It does not call the X API and does not write freely to Supabase canonical memory.
 
+Production deployment is already wired through `nikechan-xangi`:
+
+- `nikechan-x-worker` is deployed as the `nikechan-x-worker` Docker Compose service.
+- xangi calls the worker over HTTP at `http://nikechan-x-worker:8787`.
+- xangi enables the route with `NIKECHAN_X_WORKER_SELF_TWEET_ENABLED=true`.
+- the host deploy workflow clones or updates `/opt/nikechan-x-worker`, builds it, then restarts `nikechan-x-worker` together with `xangi-max`.
+
+Container startup has been verified in production. Hermes provider authentication is validated by the first real workflow execution, not by container startup.
+
 ## Memory
 
 Hermes memory is worker-local experience memory. It can remember operational lessons such as recent dry-run topics, failed patterns, and guard outcomes.
@@ -42,6 +51,8 @@ The worker calls Hermes CLI with `hermes -z` by default. Hermes receives the req
 Worker-local skill proposal/apply code is not part of the intended design. Long-term skill maintenance should use Hermes' own skill and curator commands.
 
 The worker intentionally enables Hermes `skills` and `memory` toolsets alongside the `nikechan-x-worker` MCP toolset. In dry-run mode Hermes may patch only `nikechan-x-self-tweet` via `skill_manage` when feedback or weak drafts reveal a reusable lesson. This is the autonomous improvement path.
+
+When Hermes changes the native skill, the worker snapshots the skill into `skills/hermes/nikechan-x-self-tweet/SKILL.md` and can commit that snapshot in the worker repository. The native Hermes skill remains the runtime source; the repository snapshot is for review, deployment traceability, and rollback.
 
 Set `NIKECHAN_X_WORKER_HERMES_MODE=local-fallback` only for local scaffold tests when Hermes is not installed. That mode does not exercise Hermes native memory, native skills, or the learning loop.
 

@@ -19,6 +19,36 @@ This repository is intentionally independent from `nikechan` and `nikechan-xangi
 - Memory proposals instead of unrestricted Supabase canonical writes
 - Kill switch, egress guard, and audit insertion points
 
+## Production deployment
+
+Production runs as a Docker Compose service started from `nikechan-xangi`.
+
+- Repository: `https://github.com/tegnike/nikechan-x-worker`
+- VPS path: `/opt/nikechan-x-worker`
+- Compose service: `nikechan-x-worker`
+- Internal HTTP URL from xangi: `http://nikechan-x-worker:8787`
+- xangi feature flag: `NIKECHAN_X_WORKER_SELF_TWEET_ENABLED=true`
+- xangi deploy workflow: `nikechan-host` GitHub Actions `Deploy xangi to VPS`
+
+The production `self-tweet` path is still dry-run only. xangi owns Discord thread creation, approval UI, follow-up conversation, and final presentation. This worker owns Hermes execution, context gathering, final guard checks, audit JSONL, worker-local experience memory, and `WorkflowReport` generation.
+
+Current production flow:
+
+```text
+xangi scheduler / /self-tweet
+  -> xangi creates or reuses the Discord workflow thread
+  -> xangi sends a WorkflowRequest to nikechan-x-worker
+  -> worker reads xangi-social context and public canonical memory
+  -> worker starts Hermes CLI with nikechan-x-worker, skills, and memory toolsets
+  -> Hermes uses the worker MCP tools and nikechan-x-self-tweet skill
+  -> worker applies final egress guard and audit logging
+  -> worker snapshots changed Hermes skill files into this repo when applicable
+  -> worker returns WorkflowReport JSON
+  -> xangi renders the report and waits for Discord approval/revision
+```
+
+If the worker container starts but the first workflow fails, check Hermes provider authentication inside the persistent Hermes volume first. Container startup and Hermes CLI runtime authentication are separate concerns.
+
 ## CLI
 
 ```bash
@@ -169,3 +199,13 @@ NIKECHAN_X_WORKER_HERMES_SKILL_SNAPSHOT_PATH=skills/hermes/nikechan-x-self-tweet
 ```
 
 Set `NIKECHAN_X_WORKER_HERMES_SKILL_AUTOCOMMIT=false` to disable git commits. The commit result is included in `WorkflowReport.audit.hermesSkill.snapshot`.
+
+## Discord revision loop
+
+xangi remains responsible for interpreting master replies in Discord. When a worker-origin `self-tweet` report is pending, xangi stores the candidate state in `.xangi/twitter-workflow-state.json` and routes thread replies through the same approval surface:
+
+- approve: proceed according to the current dry-run/live mode boundary
+- revise: xangi sends a new worker request with the prior candidate and master instruction
+- cancel: close the pending state without posting
+
+The revision request still goes through Hermes. This keeps the LLM execution body in the worker while xangi stays the manager shell.
