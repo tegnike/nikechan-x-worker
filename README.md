@@ -152,9 +152,11 @@ Set `NIKECHAN_X_WORKER_CANONICAL_MEMORY=disabled` for isolated local tests.
 
 `read_self_tweet_context` gives Hermes the old xangi source-collector semantics through a narrow read-only interface:
 
-- source mode rotation: `daily_life`, `tech`, `memory`, `random`
+- presence design: X is a contact/recontact surface for an AI character whose memory, relationships, and activity range grow over time
+- source mode rotation: `presence`, `daily_life`, `tech`, `memory`, `random`
 - used topics and recent presented-topic cooldown
 - recent Nikechan X posts where available
+- public presence digests and aggregate presence signal summaries
 - public episodes, notes, wiki topics, articles
 - master public tweets as auxiliary context
 - tweet performance ranking. If `nikechan/scripts/db.sh tweet-metrics-ranking` returns human-readable text instead of JSON, the worker keeps it as loaded text context instead of treating Phase B context as failed
@@ -163,6 +165,8 @@ Set `NIKECHAN_X_WORKER_CANONICAL_MEMORY=disabled` for isolated local tests.
 The worker still owns final guards. MCP tools cannot post to X, call Discord, or write canonical memory.
 
 Worker-local Hermes experience is passed to Hermes only as cooldown and learning context. It should not dominate tweet topics when public wiki, public episodes, articles, recent tweets, or master tweets are loaded.
+
+For three-candidate self-tweet runs, Hermes should avoid producing only AI coding tips. The intended balance is one presence/current-activity candidate, one light interaction or recontact candidate, and one AI character experiment or memory/development candidate.
 
 ## Hermes Native Skills
 

@@ -38,7 +38,7 @@ For self-tweet, this worker reads canonical memory only through the existing pub
 
 Hermes can be given a worker-local MCP server named `nikechan-x-worker`. The server exposes read-only context tools:
 
-- `read_self_tweet_context`: xangi-compatible source mode, used topics, cooldowns, recent X context, public source candidates, performance context, and recent run-state.
+- `read_self_tweet_context`: xangi-compatible source mode, presence design, public presence digests, aggregate presence signals, used topics, cooldowns, recent X context, public source candidates, performance context, and recent run-state.
 - `read_public_memory`: canonical public memory and provenance.
 - `read_worker_experience`: worker-local Hermes experience memory.
 - `read_self_tweet_skill`: procedural self-tweet skill.
@@ -47,6 +47,8 @@ Hermes can be given a worker-local MCP server named `nikechan-x-worker`. The ser
 These tools are the intended Phase B bridge: Hermes gathers and reasons over X workflow context itself, while the worker shell still blocks external effects and xangi remains Discord manager.
 
 `read_self_tweet_context` should consider Phase B available when public wiki, public episodes, articles, recent tweets, or master tweets are loaded. Empty notes or text-formatted tweet metrics alone should not make Hermes conclude that fresh source context is unavailable.
+
+Self-tweet generation should follow presence design: X is where humans discover Nikechan and where short posts create contact and recontact. Candidate sets should make Nikechan recognizable as an AI character with memory, relationships, and expanding places of activity, not only as an AI coding tips account.
 
 ## Skill growth
 

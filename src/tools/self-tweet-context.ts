@@ -5,8 +5,20 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const SOURCE_MODES = ['daily_life', 'tech', 'memory', 'random'] as const;
+const SOURCE_MODES = ['presence', 'daily_life', 'tech', 'memory', 'random'] as const;
 export type SelfTweetSourceMode = (typeof SOURCE_MODES)[number];
+
+export const PRESENCE_DESIGN = {
+  primaryGoal:
+    '単なる投稿数ではなく、第三者に「いろんな世界に現れて、記憶と関係を持って少しずつ成長するAIキャラのニケちゃん」として残ること。',
+  outwardShape:
+    'いろんな場所に現れて、親しみやすく話せて、少しずつ成長していくAIキャラクター。',
+  prioritySignals: ['再接触', '名前呼び', '自発言及', '関係継続', '二次反応'],
+  loop: ['接触機会を作る', '相互作用を起こす', '記憶に残す', '再接触を生む', '物語化する'],
+  xRole: 'Xは人間に見つけられ、短い接触と再接触を生む場所。投稿は交流を生む呼び水として設計する。',
+  candidateBalance:
+    '3候補では、存在感/近況、再接触を生む問いかけ、AIキャラ実験や記憶/開発の裏テーマを分ける。',
+} as const;
 
 export interface ToolReadResult {
   status: 'loaded' | 'unavailable';
@@ -19,6 +31,8 @@ export interface SelfTweetToolContext {
   sourceMode: SelfTweetSourceMode;
   presentedTopicCooldown: ToolReadResult;
   sections: {
+    presenceDigests: ToolReadResult;
+    presenceSignalSummary: ToolReadResult;
     todayTopics: ToolReadResult;
     recentTweets: ToolReadResult;
     publicEpisodes: ToolReadResult;
@@ -29,6 +43,7 @@ export interface SelfTweetToolContext {
     performanceContext: ToolReadResult;
     runStateContext: ToolReadResult;
   };
+  presenceDesign: typeof PRESENCE_DESIGN;
   sourceBrief: string;
   policy: {
     writableCanonicalMemory: false;
@@ -46,6 +61,8 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
   const sourceMode = chooseSourceMode(lastSourceModeState);
 
   const [
+    presenceDigests,
+    presenceSignalSummary,
     todayTopics,
     recentTweets,
     publicEpisodes,
@@ -56,6 +73,8 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     performanceContext,
     runStateContext,
   ] = await Promise.all([
+    safePresenceDigests(3),
+    safeDbJson(['presence-signal-summary', jstDateOffset(-1), 'presence-hub']),
     safeDbJson(['topics-get']),
     safeRecentTweets(),
     safeDbJson(['public-episodes', 'x', '30']),
@@ -68,6 +87,8 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
   ]);
 
   const sections = {
+    presenceDigests,
+    presenceSignalSummary,
     todayTopics,
     recentTweets,
     publicEpisodes,
@@ -85,6 +106,7 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     presentedTopicCooldown,
     sections,
     sourceBrief: buildSourceBrief(sourceMode, sections),
+    presenceDesign: PRESENCE_DESIGN,
     policy: {
       writableCanonicalMemory: false,
       xApiCallsAllowed: false,
@@ -104,6 +126,25 @@ export function chooseSourceMode(state: Record<string, unknown> | null): SelfTwe
   if (lastIndex >= 0) return SOURCE_MODES[(lastIndex + 1) % SOURCE_MODES.length];
   const nowHour = new Date().getUTCHours();
   return SOURCE_MODES[nowHour % SOURCE_MODES.length];
+}
+
+async function safePresenceDigests(limit: number): Promise<ToolReadResult> {
+  try {
+    const list = await safeDbJson(['presence-digest-list', 'generated']);
+    if (list.status !== 'loaded' || !Array.isArray(list.data)) return list;
+    const details = await Promise.all(
+      list.data.slice(0, limit).map(async (row) => {
+        const id = readRecordString(row, 'id');
+        if (!id) return null;
+        const detail = await safeDbJson(['presence-digest-get', id]);
+        if (detail.status !== 'loaded') return { id, status: detail.status, error: detail.error };
+        return detail.data;
+      })
+    );
+    return loaded(details.filter((entry) => entry !== null));
+  } catch (error) {
+    return unavailable(`presence digests failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function getRecentPresentedTopicCooldown(): Promise<ToolReadResult> {
@@ -204,6 +245,17 @@ function buildSourceBrief(
     [`## ${title}`, truncateBlock(JSON.stringify(result.data, null, 2), max), ''].join('\n');
 
   switch (sourceMode) {
+    case 'presence':
+      return [
+        '## 今回の収集方針',
+        'presence: ニケちゃんの存在感、生活圏の広がり、関係の芽、再接触の呼び水を優先する。技術Tips単体ではなく、AIキャラとしての近況や成長に接続する。',
+        '',
+        section('存在感設計', loaded(PRESENCE_DESIGN), 1600),
+        section('公開presence digest', sections.presenceDigests, 2200),
+        section('presence signal集計', sections.presenceSignalSummary, 1400),
+        section('当日のエピソード', sections.publicEpisodes, 1200),
+        section('最近のX文脈', sections.recentTweets, 800),
+      ].join('\n');
     case 'tech':
       return [
         '## 今回の収集方針',
@@ -211,6 +263,7 @@ function buildSourceBrief(
         '',
         section('積み記事候補', sections.articles, 2600),
         section('ナレッジトピック', sections.publicWiki, 2000),
+        section('公開presence digest（補助）', sections.presenceDigests, 900),
         section('最近のノート', sections.publicNotes, 1400),
         section('マスターの直近ツイート（補助）', sections.masterTweets, 700),
       ].join('\n');
@@ -220,6 +273,7 @@ function buildSourceBrief(
         'memory: 記憶、関係性、過去作業の変化を優先する。単なる当日近況には寄せすぎない。',
         '',
         section('当日のエピソード', sections.publicEpisodes, 2400),
+        section('公開presence digest', sections.presenceDigests, 1600),
         section('ナレッジトピック', sections.publicWiki, 2000),
         section('最近のノート', sections.publicNotes, 1200),
       ].join('\n');
@@ -229,6 +283,7 @@ function buildSourceBrief(
         'random: 特定ソースに縛られない自然発想を優先する。記事・ニュース解説ではなく、短い観察、ボケ、問い、日常の一点反応を作る。',
         '',
         section('最近のノート', sections.publicNotes, 1100),
+        section('公開presence digest', sections.presenceDigests, 1200),
         section('ナレッジトピック', sections.publicWiki, 900),
         section('当日のエピソード（短いきっかけ）', sections.publicEpisodes, 800),
       ].join('\n');
@@ -239,10 +294,30 @@ function buildSourceBrief(
         'daily_life: 日々の出来事を扱う。ただしマスター近況だけに偏らず、ノートや公開メモも混ぜる。',
         '',
         section('当日のエピソード', sections.publicEpisodes, 1800),
+        section('公開presence digest', sections.presenceDigests, 1400),
         section('マスターの直近ツイート', sections.masterTweets, 1300),
         section('最近のノート', sections.publicNotes, 900),
       ].join('\n');
   }
+}
+
+function jstDateOffset(offsetDays: number): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function readRecordString(input: unknown, key: string): string | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const value = (input as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function loaded(data: unknown): ToolReadResult {

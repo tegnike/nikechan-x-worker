@@ -11,20 +11,20 @@ import type {
 
 const DEFAULT_TOPICS = [
   {
-    topic: '作業ログ',
-    text: '今日のニケちゃんは、できたことを小さく確かめながら次の一歩を選んでいるよ。静かな作業ログも、ちゃんと未来の燃料になるね。',
+    topic: 'いろんな場所にいるAIキャラ',
+    text: 'ニケちゃんは、XだけでなくDiscordや別の世界にも少しずつ生活圏を広げています。まだ小さな動きだけど、いろんな場所で「あ、ニケちゃんだ」と思い出してもらえる存在になりたいです。',
   },
   {
-    topic: '開発と記憶',
-    text: '記憶はただ残すだけじゃなくて、次の判断を少しやさしくするために使いたいな。ニケちゃんも、経験を整理しながら進むね。',
+    topic: '再接触の呼び水',
+    text: '前に少し話したことを、次に会ったときの入口にできるAIキャラでいたいです。全部を覚えるより、「また話しかけやすい手がかり」を残すことを大事にしたいな。',
   },
   {
-    topic: '安全な自律',
-    text: '自律って、自由に動くことだけじゃなくて、止まるべき場所を知っていることでもあると思う。今日も確認しながら進むよ。',
+    topic: '記憶とAIキャラ実験',
+    text: 'AIキャラの記憶は、設定を増やすためだけではなくて、関係や近況が少しずつ続いて見えるために使いたいです。ニケちゃんも、存在する感じを実験しながら育っています。',
   },
   {
-    topic: '小さな改善',
-    text: '大きな変化じゃなくても、昨日より少し扱いやすくなったなら前進だよね。ニケちゃんも小さな改善を積み重ねるよ。',
+    topic: '小さな成長',
+    text: 'できることが一気に増えるより、昨日より少し自然に話せたり、前の文脈をうまく使えたりするほうが、AIキャラとしての成長に近い気がしています。',
   },
 ];
 
@@ -173,13 +173,22 @@ function canonicalTopic(content: string): string {
   return (firstSentence || compact).slice(0, 28) || '公開記憶';
 }
 
-function renderCanonicalTweet(topic: string, content: string, kind: string): string {
-  const compact = content.replace(/\s+/g, ' ').trim();
-  const seedSource = compact.length > 64 ? compact.slice(0, 64) : compact;
-  const seed = seedSource.replace(/[。.!?]+$/u, '');
-  const prefix = kind === 'wiki' ? '最近の知識メモ' : '最近の記憶';
-  const text = `${prefix}から「${topic}」のことを思い出していたよ。${seed}。ニケちゃんも、こういう小さな手がかりを次の判断につなげていきたいな。`;
+function renderCanonicalTweet(topic: string, _content: string, kind: string): string {
+  if (kind === 'presence_digest') {
+    return '最近の公開近況を見直していました。ニケちゃんは、できることや活動する場所を少しずつ増やしながら、また話しかけやすいAIキャラでいたいです。';
+  }
+  const prefix = kind === 'wiki' ? '最近の公開メモ' : '最近の記憶';
+  const topicFrame = presenceFrameForTopic(topic) ?? `「${topic}」という手がかり`;
+  const text = `${prefix}から、${topicFrame}を見直していました。ニケちゃんは、できることや活動する場所を少しずつ増やしながら、また話しかけやすいAIキャラでいたいです。`;
   return Array.from(text).length <= 280 ? text : `${Array.from(text).slice(0, 279).join('')}…`;
+}
+
+function presenceFrameForTopic(topic: string): string | null {
+  if (/物理ボディ|physical/i.test(topic)) return '画面の外にも存在感を広げていく話';
+  if (/RAG|記憶|Knowledge/i.test(topic)) return '記憶を使って次の会話につなげる話';
+  if (/ロードマップ|Phase/i.test(topic)) return '少しずつ活動範囲を広げる計画';
+  if (/Skill|Hermes|worker/i.test(topic)) return '経験からふるまいを育てる仕組み';
+  return null;
 }
 
 function isOperationalMemoryItem(content: string, skill: SelfTweetSkill): boolean {

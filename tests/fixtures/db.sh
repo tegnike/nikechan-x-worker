@@ -17,6 +17,9 @@ case "${1:-}" in
   presence-digest-get)
     printf '%s\n' '[{"id":"pd1","target_date":"2026-05-15","surface":"x","status":"generated","title":"Presence digest 2026-05-15","summary":"ニケちゃんはHermes workerのdry-runを通じて、安全境界と小さな改善の進め方を確認した。","generated_at":"2026-05-15T12:00:00Z"}]'
     ;;
+  presence-signal-summary)
+    printf '%s\n' '{"target_date":"2026-05-15","surface":"presence-hub","signals":{"public_activity_episodes":{"count":2},"public_contact_events":{"count":1},"x_reactions":{"count":3}},"metadata":{"memory_class":"presence_signal_aggregate","redaction_status":"aggregate_only"}}'
+    ;;
   topics-get)
     printf '%s\n' '[{"topic":"Hermes workerの境界","created_at":"2026-05-15T10:00:00Z"}]'
     ;;

@@ -151,7 +151,7 @@ describe('runWorkflow', () => {
     expect(report.audit.canonicalMemory).toBe('loaded');
     expect(report.sourceRefs.some((ref) => ref.type === 'local_episode')).toBe(true);
     expect(report.sourceRefs.some((ref) => ref.type === 'presence_digest')).toBe(true);
-    expect(report.actions[0]?.preview).toContain('公開メモの話題');
+    expect(report.actions[0]?.preview).toContain('AIキャラ');
   });
 
   it('records feedback without using worker-local skill mutation', async () => {
@@ -285,6 +285,8 @@ describe('runWorkflow', () => {
     expect(context.policy.discordCallsAllowed).toBe(false);
     expect(context.policy.writableCanonicalMemory).toBe(false);
     expect(context.sections.publicEpisodes.status).toBe('loaded');
+    expect(context.sections.presenceDigests.status).toBe('loaded');
+    expect(context.presenceDesign.primaryGoal).toContain('AIキャラのニケちゃん');
     expect(JSON.stringify(context.sections.articles.data)).toContain('Agent memory design');
     expect(context.sourceBrief).toContain('今回の収集方針');
   });
@@ -323,6 +325,7 @@ esac
     expect(chooseSourceMode({ mode: 'daily_life' })).toBe('tech');
     expect(chooseSourceMode({ mode: 'tech' })).toBe('memory');
     expect(chooseSourceMode({ mode: 'memory' })).toBe('random');
-    expect(chooseSourceMode({ mode: 'random' })).toBe('daily_life');
+    expect(chooseSourceMode({ mode: 'random' })).toBe('presence');
+    expect(chooseSourceMode({ mode: 'presence' })).toBe('daily_life');
   });
 });

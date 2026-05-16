@@ -11,6 +11,7 @@ import type {
   HermesDecisionInput,
   SelfTweetCandidate,
 } from './types.js';
+import { PRESENCE_DESIGN } from '../tools/self-tweet-context.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -81,6 +82,13 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '',
     `Task: decide ${maxActions} dry-run self-tweet candidate(s) for AI Nikechan on X.`,
     '',
+    'Presence design contract:',
+    JSON.stringify(PRESENCE_DESIGN, null, 2),
+    '',
+    '- X self-tweets should make AI Nikechan recognizable as an AI character with memory, relationships, and expanding places of activity.',
+    '- Do not reduce Nikechan to generic AI coding tips. Technical observations are useful only when connected to Nikechan activity, memory, character growth, or AI character culture.',
+    '- Posts should act as a lightweight contact point: easy to react to, remember, or revisit.',
+    '',
     'Phase B safe tool contract:',
     '- Prefer read_self_tweet_context for source mode, run-state, recent X context, topic cooldown, articles, and performance context.',
     '- Prefer read_public_memory for canonical public memory and provenance.',
@@ -110,6 +118,8 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '- Make candidates meaningfully different in angle, rhythm, and source use.',
     '- At most one candidate may reuse a repeated worker-experience topic such as recovery paths, fallback handling, or "next steps after failure".',
     '- At least one candidate should be grounded in public wiki, public episodes, articles, recent tweets, or master tweets rather than worker-local experience.',
+    '- If returning 3 candidates, aim for this balance: one presence/current-activity candidate, one light interaction/recontact candidate, and one AI character experiment or memory/development candidate.',
+    '- At most one candidate may be a pure implementation tip. Prefer "Nikechan is doing/learning/remembering/meeting" over abstract advice.',
     '',
     'Return exactly this JSON shape:',
     '{',
