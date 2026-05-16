@@ -94,17 +94,20 @@ describe('runWorkflow', () => {
     expect(report.skillProposals).toEqual([]);
   });
 
-  it('blocks non-dry-run mode during initial scope', async () => {
+  it('allows approval-gated live candidate generation without direct posting', async () => {
     const report = await runWorkflow({
       workflow: 'self-tweet',
       surface: 'x',
       mode: 'live',
       requested_by: 'xangi',
+      constraints: { require_approval: true, max_actions: 1 },
     });
 
-    expect(report.status).toBe('blocked');
-    expect(report.summary).toContain('initial scope only permits dry-run mode');
-    expect(report.actions[0]?.status).toBe('blocked');
+    expect(report.status).toBe('needs_approval');
+    expect(report.summary).toContain('live mode');
+    expect(report.audit.dryRun).toBe(false);
+    expect(report.actions[0]?.status).toBe('proposed');
+    expect(report.nextAction).toContain('worker did not call the X API');
   });
 
   it('honors kill switch', async () => {
@@ -172,7 +175,7 @@ describe('runWorkflow', () => {
 
     expect(report.status).toBe('needs_approval');
     expect(report.skillProposals).toEqual([]);
-    expect(report.nextAction).toContain('revised dry-run candidate');
+    expect(report.nextAction).toContain('revised candidate');
   });
 
   it('uses Hermes CLI runtime when configured', async () => {

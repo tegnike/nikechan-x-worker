@@ -11,9 +11,9 @@ This repository is the independent Hermes Agent worker for AI Nikechan's X activ
 
 ## Initial implementation
 
-The first supported workflow is `self-tweet` in `dry-run` mode only.
+The first supported workflow is `self-tweet` for dry-run / canary / live candidate generation.
 
-It returns one tweet candidate as a proposed `post_tweet` action. It does not call the X API and does not write freely to Supabase canonical memory.
+It returns tweet candidates as proposed `post_tweet` actions. It does not call the X API directly and does not write freely to Supabase canonical memory. xangi performs the actual approval-gated post when the release mode allows live execution.
 
 Production deployment is already wired through `nikechan-xangi`:
 
@@ -26,7 +26,7 @@ Container startup has been verified in production. Hermes provider authenticatio
 
 ## Memory
 
-Hermes memory is worker-local experience memory. It can remember operational lessons such as recent dry-run topics, failed patterns, and guard outcomes.
+Hermes memory is worker-local experience memory. It can remember operational lessons such as recent topics, failed patterns, and guard outcomes.
 
 For self-tweet generation, worker-local experience is cooldown and learning context. It should help Hermes detect repetition and operator feedback, but it should not become the primary tweet source when fresh Phase B context is available.
 
@@ -56,7 +56,7 @@ The worker calls Hermes CLI with `hermes -z` by default. Hermes receives the req
 
 Worker-local skill proposal/apply code is not part of the intended design. Long-term skill maintenance should use Hermes' own skill and curator commands.
 
-The worker intentionally enables Hermes `skills` and `memory` toolsets alongside the `nikechan-x-worker` MCP toolset. In dry-run mode Hermes may patch only `nikechan-x-self-tweet` via `skill_manage` when feedback or weak drafts reveal a reusable lesson. This is the autonomous improvement path.
+The worker intentionally enables Hermes `skills` and `memory` toolsets alongside the `nikechan-x-worker` MCP toolset. During approval-gated candidate generation Hermes may patch only `nikechan-x-self-tweet` via `skill_manage` when feedback or weak drafts reveal a reusable lesson. This is the autonomous improvement path.
 
 When Hermes changes the native skill, the worker snapshots the skill into `skills/hermes/nikechan-x-self-tweet/SKILL.md` and can commit that snapshot in the worker repository. The native Hermes skill remains the runtime source; the repository snapshot is for review, deployment traceability, and rollback.
 

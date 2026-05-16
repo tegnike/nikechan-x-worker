@@ -64,9 +64,8 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
     candidate,
     egress: checkTweetEgress(candidate.tweetText),
   }));
-  const dryRunOnlyBlocked = request.mode !== 'dry-run';
   const killSwitchBlocked = killSwitch.global === 'closed' || killSwitch.surface === 'closed';
-  const guardBlocked = killSwitchBlocked || dryRunOnlyBlocked;
+  const guardBlocked = killSwitchBlocked;
   const proposedCandidates = candidateEgress.filter((entry) => entry.egress.status === 'passed');
   const blockedCandidates = candidateEgress.filter((entry) => entry.egress.status === 'blocked');
   const blocked = guardBlocked || proposedCandidates.length === 0;
@@ -77,14 +76,18 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
   const report: WorkflowReport = {
     surface: request.surface,
     workflow: request.workflow,
-    status: blocked ? 'blocked' : request.constraints?.require_approval === false ? 'dry-run' : 'needs_approval',
+    status: blocked
+      ? 'blocked'
+      : request.constraints?.require_approval === false && request.mode === 'dry-run'
+        ? 'dry-run'
+        : 'needs_approval',
     summary: blocked
       ? buildBlockedSummary(
           killSwitch.reasons,
           blockedCandidates.flatMap((entry) => entry.egress.reasons),
-          dryRunOnlyBlocked
+          undefined
         )
-      : `Generated ${proposedCandidates.length} self-tweet candidate(s) in dry-run mode.`,
+      : `Generated ${proposedCandidates.length} self-tweet candidate(s) in ${request.mode} mode.`,
     actions: candidateEgress.map((entry, index) => ({
       type: 'post_tweet',
       status: guardBlocked || entry.egress.status === 'blocked' ? 'blocked' : 'proposed',
@@ -92,7 +95,7 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
       preview: entry.candidate.tweetText,
       reason:
         guardBlocked || entry.egress.status === 'blocked'
-          ? buildBlockedSummary(killSwitch.reasons, entry.egress.reasons, dryRunOnlyBlocked)
+          ? buildBlockedSummary(killSwitch.reasons, entry.egress.reasons)
           : undefined,
       metadata: {
         topic: entry.candidate.topic,
@@ -126,12 +129,12 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
     nextAction: blocked
       ? 'Inspect guard audit and keep X execution stopped.'
       : feedbackInput
-        ? 'Review the revised dry-run candidate. No X API call was made.'
+        ? 'Review the revised candidate. The worker did not call the X API.'
         : skillProposals.length
-          ? 'Review pending skill proposals before the next iteration. No X API call was made.'
+          ? 'Review pending skill proposals before the next iteration. The worker did not call the X API.'
         : request.constraints?.require_approval === false
-          ? 'Dry-run complete. xangi may discard or show the candidate.'
-          : 'Wait for xangi approval. No X API call was made.',
+          ? 'Candidate generation complete. xangi may discard or show the candidate.'
+          : 'Wait for xangi approval. The worker did not call the X API.',
     createdAt,
   };
 
@@ -204,12 +207,10 @@ function createFailedReport(input: {
 function buildBlockedSummary(
   killSwitchReasons: string[],
   egressReasons: string[],
-  dryRunOnlyBlocked: boolean
+  extraReason?: string
 ): string {
-  const reasons = [
-    ...killSwitchReasons,
-    ...egressReasons,
-    dryRunOnlyBlocked ? 'initial scope only permits dry-run mode' : null,
-  ].filter((reason): reason is string => Boolean(reason));
+  const reasons = [...killSwitchReasons, ...egressReasons, extraReason].filter(
+    (reason): reason is string => Boolean(reason)
+  );
   return `Workflow blocked: ${reasons.join('; ')}`;
 }

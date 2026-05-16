@@ -8,8 +8,8 @@ This repository is intentionally independent from `nikechan` and `nikechan-xangi
 ## Initial scope
 
 - Hermes Agent runtime abstraction for worker workflows
-- `self-tweet` dry-run workflow
-- No real X posting
+- `self-tweet` workflow for dry-run / canary / live candidate generation
+- No direct X API posting from the worker; xangi performs approval-gated posting
 - CLI and HTTP entrypoints for `xangi`
 - `WorkflowReport` JSON response
 - Worker-local Hermes memory under `.worker/hermes-memory.json`
@@ -30,7 +30,7 @@ Production runs as a Docker Compose service started from `nikechan-xangi`.
 - xangi feature flag: `NIKECHAN_X_WORKER_SELF_TWEET_ENABLED=true`
 - xangi deploy workflow: `nikechan-host` GitHub Actions `Deploy xangi to VPS`
 
-The production `self-tweet` path is still dry-run only. xangi owns Discord thread creation, approval UI, follow-up conversation, and final presentation. This worker owns Hermes execution, context gathering, final guard checks, audit JSONL, worker-local experience memory, and `WorkflowReport` generation.
+The production `self-tweet` path is approval-gated. xangi owns Discord thread creation, approval UI, follow-up conversation, final presentation, and the actual X posting call after approval. This worker owns Hermes execution, context gathering, final guard checks, audit JSONL, worker-local experience memory, and `WorkflowReport` generation.
 
 Current production flow:
 
@@ -45,6 +45,7 @@ xangi scheduler / /self-tweet
   -> worker snapshots changed Hermes skill files into this repo when applicable
   -> worker returns WorkflowReport JSON
   -> xangi renders the report and waits for Discord approval/revision
+  -> on approval, xangi posts through the existing Twitter posting guard unless release mode is dry-run/shadow
 ```
 
 If the worker container starts but the first workflow fails, check Hermes provider authentication inside the persistent Hermes volume first. Container startup and Hermes CLI runtime authentication are separate concerns.
@@ -82,7 +83,7 @@ The MCP server exposes read-only tools only:
 - `read_self_tweet_skill`
 - `read_guard_status`
 
-Hermes is instructed to use these tools instead of terminal/file access to inspect xangi internals. The `skills` and `memory` toolsets are intentionally enabled so Hermes can improve `nikechan-x-self-tweet` during dry-run.
+Hermes is instructed to use these tools instead of terminal/file access to inspect xangi internals. The `skills` and `memory` toolsets are intentionally enabled so Hermes can improve `nikechan-x-self-tweet` during approval-gated candidate generation.
 
 ## HTTP
 
@@ -102,7 +103,7 @@ Request:
 {
   "workflow": "self-tweet",
   "surface": "x",
-  "mode": "dry-run",
+  "mode": "live",
   "requested_by": "xangi",
   "schedule_id": "sch_self_tweet",
   "correlation_id": "2026-05-15T00:00:00Z-sch_self_tweet",
@@ -113,7 +114,7 @@ Request:
 }
 ```
 
-Response is a `WorkflowReport`. In the initial dry-run scope it returns one proposed `post_tweet` action and never calls the X API.
+Response is a `WorkflowReport`. It returns proposed `post_tweet` actions and never calls the X API directly. xangi decides whether approval leads to a real post based on the current release mode.
 
 ## Safety boundary
 
@@ -122,7 +123,7 @@ The worker checks:
 - global kill switch
 - X surface kill switch
 - `xangi-social` core profile when a snapshot is available
-- dry-run only release mode
+- dry-run / shadow / canary / live release mode
 - tweet length and public egress checks
 - secret-like token patterns
 - raw private / operational memory markers
@@ -182,7 +183,7 @@ hermes curator run
 
 The worker does not mutate skill files directly during workflow execution. `skillProposals` remains in `WorkflowReport` only as a compatibility field for structured Hermes output; this repo no longer generates local fallback skill proposals.
 
-During dry-run, Hermes may patch only `nikechan-x-self-tweet` through its native `skill_manage` tool when feedback or repeated weak drafts reveal a reusable lesson. This is the autonomous improvement path; xangi still owns Discord approval and the worker still owns final egress/audit checks.
+During approval-gated candidate generation, Hermes may patch only `nikechan-x-self-tweet` through its native `skill_manage` tool when feedback or repeated weak drafts reveal a reusable lesson. This is the autonomous improvement path; xangi still owns Discord approval and the worker still owns final egress/audit checks.
 
 The local Hermes skill should exist at:
 
