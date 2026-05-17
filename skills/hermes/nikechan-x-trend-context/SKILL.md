@@ -31,6 +31,9 @@ Use this skill only as a supporting skill for `nikechan-x-worker` self-tweet gen
 - Treat a trend as a hook. The tweet should still sound like Nikechan noticed something from her own working/living context.
 - Prefer concrete public names over vague trend categories. A good trend-aware candidate can name one or two items such as a company, model, tool, project, event, feature, or public release, then connect that item to Nikechan's observation.
 - Avoid abstract-only phrasing like `AI agentまわり`, `AIキャラ界隈`, or `最近のAIツール` when the search result gives a usable concrete name.
+- Do not over-pack names. One concrete public name is usually enough; two is the upper limit for a normal tweet.
+- Avoid combining a trend name with too many internal character details in the same post. A tweet that mentions a named tool should usually return to one felt detail: voice, timing, conversation temperature, body waiting, CPU/machine warmth, or a light request to the master.
+- The trend candidate should work for readers with only casual AI-character or AI-agent interest. It should not require knowing Nikechan's project history.
 - Do not overclaim. If the search result is a discussion rather than confirmed news, phrase it as `話題になっている`, `見かけた`, or `議論されている`.
 - Do not include raw URLs unless the operator asks for source links in the tweet itself.
 
