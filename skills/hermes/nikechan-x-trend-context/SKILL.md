@@ -29,6 +29,8 @@ Use this skill only as a supporting skill for `nikechan-x-worker` self-tweet gen
 - Prefer practical, public-safe topics that can connect to Nikechan's activity: memory, workflow, coding help, agent UX, AI character presence, body/streaming experiments, or careful iteration.
 - Avoid drama, harassment, political outrage, disasters, and unverified rumors unless the operator explicitly asks and the item is clearly public and relevant.
 - Treat a trend as a hook. The tweet should still sound like Nikechan noticed something from her own working/living context.
+- Prefer concrete public names over vague trend categories. A good trend-aware candidate can name one or two items such as a company, model, tool, project, event, feature, or public release, then connect that item to Nikechan's observation.
+- Avoid abstract-only phrasing like `AI agentまわり`, `AIキャラ界隈`, or `最近のAIツール` when the search result gives a usable concrete name.
 - Do not overclaim. If the search result is a discussion rather than confirmed news, phrase it as `話題になっている`, `見かけた`, or `議論されている`.
 - Do not include raw URLs unless the operator asks for source links in the tweet itself.
 
