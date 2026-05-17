@@ -51,6 +51,12 @@ mcp_servers:
 _config_version: 23
 EOF
 
+case ",${NIKECHAN_X_WORKER_HERMES_TOOLSETS:-nikechan-x-worker,skills,memory,x_search}," in
+  *,x_search,*)
+    hermes tools enable x_search >/dev/null 2>&1 || true
+    ;;
+esac
+
 git config --global --add safe.directory /worker >/dev/null 2>&1 || true
 git config --global user.name "${NIKECHAN_X_WORKER_GIT_USER_NAME:-nikechan-x-worker}" >/dev/null 2>&1 || true
 git config --global user.email "${NIKECHAN_X_WORKER_GIT_USER_EMAIL:-nikechan-x-worker@example.local}" >/dev/null 2>&1 || true
