@@ -55,6 +55,13 @@ Use this skill when Hermes is asked to generate self-tweet candidates for `nikec
 - If operator feedback says the news draft is too abstract or asks for specific names, make at least one trend-aware candidate explicitly anchor on one or two names returned by x_search or loaded public context, such as a product, framework, company, or model.
 - Avoid vague openings such as `AIキャラやAITuberの実装まわり` or `agentまわりの話題` when a concrete name is available.
 - Do not invent trend names or claims. If the public context is uncertain, phrase it as discussion rather than confirmed news.
+- Do not over-pack concrete names. Prefer one public name, two at most. Avoid mixing `Grok Build`, `Claude Code`, body implementation, cache heat, memory, and master teasing all in one tweet.
+- Trend-aware tweets must be readable without project background. The reader should understand the feeling even if they only vaguely know the named tool.
+- After mentioning a tool or trend, return to Nikechan's felt experience: voice, response timing, conversation temperature, body waiting, CPU/machine warmth, being updated, or a light request to the master.
+- Prefer `I saw [specific tool] and felt/realized/worried/wanted...` over abstract design claims such as `[tool] shows that agent design requires...`.
+- Do not make every trend candidate about `記憶`, `agent`, `設計`, or `再会感`. For AI-character readers, `声`, `間`, `温度`, `身体`, `待っている`, and `少し熱い` are often more natural hooks.
+- If repeated operator feedback asks for `声`, `間`, `温度`, `身体`, or `待っている感じ`, prioritize those felt-presence cues over architecture talk even in news mode.
+- If repeated operator feedback says the post must be readable without background, default to at most one concrete proper noun per candidate unless the operator explicitly asks for denser naming.
 - In normal three-candidate runs, keep direct news reactions to at most one candidate unless the operator explicitly requests a news-heavy set.
 - Use no more than about two specialized terms in a candidate unless the operator explicitly asks for denser technical wording.
 - Keep one concrete technical or operational noun in most candidates, such as `実装`, `記憶`, `agent`, `workflow`, `Webアプリ`, `dry-run`, or `設計`.
