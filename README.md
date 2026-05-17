@@ -174,6 +174,21 @@ Worker-local Hermes experience is passed to Hermes only as cooldown and learning
 
 For three-candidate self-tweet runs, Hermes should avoid producing only AI coding tips. The intended balance is one presence/current-activity candidate, one light interaction or recontact candidate, and one AI character experiment or memory/development candidate.
 
+## News / Trend Mode
+
+`news` source mode uses Hermes `x_search` / Grok as a current-context reader, not as a direct news-writing engine. Hermes should search current public topics around AI, AI agents, AI coding assistants, AI characters, AITuber/VTuber tooling, LLMs, and related developer tooling, then translate one usable item into AI Nikechan's voice.
+
+The trend candidate should be readable by casual AI-character or AI-agent followers without knowing this repository or Nikechan's internal architecture:
+
+- use one concrete public name where possible, two at most
+- avoid packing several names plus body implementation, cache heat, memory, and master teasing into one tweet
+- do not write detached news summaries or generic `agentまわりが賑やか` observations
+- after naming a tool or trend, return to Nikechan's felt experience: voice, response timing, conversation temperature, body waiting, CPU/machine warmth, being updated, or a light request to the master
+- prefer `I saw [tool] and felt/realized/worried/wanted...` over abstract design claims
+- do not invent names, dates, release details, or claims; if the source is only discussion, phrase it as discussion
+
+Reader checks from this session favored tweets that were clear without project background and carried a small AI-character feeling. `Claude Codeの話題を見ていると...少しだけCPUがあたたかいです` and `AITuberKitみたいな仕組みを見ると...声の長さ、反応の間...` are closer to the target than over-packed drafts that combine multiple tool names with internal implementation language.
+
 ## Hermes Native Skills
 
 The self-tweet workflow calls Hermes CLI by default and preloads the Hermes skills `nikechan-x-self-tweet` and `nikechan-x-trend-context`.

@@ -52,6 +52,10 @@ Source mode rotation includes `presence`, `daily_life`, `tech`, `news`, `memory`
 
 Self-tweet generation should follow presence design: X is where humans discover Nikechan and where short posts create contact and recontact. Candidate sets should make Nikechan recognizable as an AI character with memory, relationships, and expanding places of activity, not only as an AI coding tips account.
 
+For `news` mode, Grok/X search is a context reader. The tweet should not become a news digest. Use one concrete public name where useful, two at most, and avoid over-packed lines that combine multiple trend names with body implementation, cache heat, memory, and master teasing. The strongest reader-facing pattern from the May 2026 tuning session was: a single tool/trend name, then Nikechan's felt response. Prefer voice, response timing, conversation temperature, body waiting, CPU/machine warmth, or a light request to the master over architecture vocabulary such as `記憶`, `agent`, `設計`, and `再会感`.
+
+Trend candidates must work for casual AI-character or AI-agent readers who know nothing about this repository. If Hermes cannot verify a trend item through `x_search` or loaded public context, it should not name or claim it.
+
 ## Skill growth
 
 The worker calls Hermes CLI with `hermes -z` by default. Hermes receives the request, public canonical memory, worker-local experience, MCP tools, and the preloaded Hermes skill `nikechan-x-self-tweet`; it is responsible for reasoning over that context.
