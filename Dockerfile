@@ -8,7 +8,9 @@ RUN apt-get update && apt-get install -y \
     jq \
     python3 \
     python3-pip \
-    && python3 -m pip install --break-system-packages --no-cache-dir hermes-agent mcp \
+    && python3 -m pip install --break-system-packages --no-cache-dir \
+      "git+https://github.com/NousResearch/hermes-agent.git@519657aa98d4969ec9e23c70c074d1982ef3ccf1" \
+      mcp \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker-entrypoint.sh /usr/local/bin/nikechan-x-worker-entrypoint

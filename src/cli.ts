@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { stdin } from 'node:process';
 import { startServer } from './server.js';
@@ -40,17 +41,38 @@ async function main(): Promise<void> {
     if (result.status !== 0) {
       throw new Error(`hermes mcp add failed with status ${result.status ?? 'unknown'}`);
     }
+    syncHermesSkills();
     process.stdout.write(
       [
         '',
         'Hermes MCP server registered.',
-        `Recommended toolset for worker runs: ${name}:read_self_tweet_context,${name}:read_public_memory,${name}:read_worker_experience,${name}:read_self_tweet_skill,${name}:read_guard_status`,
+        `Recommended toolsets for worker runs: ${name},skills,memory,x_search`,
+        `Worker MCP tools: ${name}:read_self_tweet_context,${name}:read_public_memory,${name}:read_worker_experience,${name}:read_self_tweet_skill,${name}:read_guard_status`,
         '',
       ].join('\n')
     );
     return;
   }
   printHelp();
+}
+
+function syncHermesSkills(): void {
+  const hermesHome = process.env.HERMES_HOME?.trim() || resolve(homedir(), '.hermes');
+  const skillNames = (
+    process.env.NIKECHAN_X_WORKER_HERMES_SKILLS ?? 'nikechan-x-self-tweet,nikechan-x-trend-context'
+  )
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  for (const skillName of skillNames) {
+    const sourcePath = resolve(process.cwd(), 'skills', 'hermes', skillName, 'SKILL.md');
+    if (!existsSync(sourcePath)) continue;
+    const targetDir = resolve(hermesHome, 'skills', skillName);
+    const targetPath = resolve(targetDir, 'SKILL.md');
+    mkdirSync(targetDir, { recursive: true });
+    if (!existsSync(targetPath)) copyFileSync(sourcePath, targetPath);
+  }
 }
 
 async function readRequest(args: string[]): Promise<unknown> {

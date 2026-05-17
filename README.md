@@ -39,7 +39,7 @@ xangi scheduler / /self-tweet
   -> xangi creates or reuses the Discord workflow thread
   -> xangi sends a WorkflowRequest to nikechan-x-worker
   -> worker reads xangi-social context and public canonical memory
-  -> worker starts Hermes CLI with nikechan-x-worker, skills, and memory toolsets
+  -> worker starts Hermes CLI with nikechan-x-worker, skills, memory, and x_search toolsets
   -> Hermes uses the worker MCP tools and nikechan-x-self-tweet skill
   -> worker applies final egress guard and audit logging
   -> worker snapshots changed Hermes skill files into this repo when applicable
@@ -68,12 +68,16 @@ For Phase B runs, register the worker MCP server once and enable the dedicated M
 ```bash
 npm run build
 node dist/cli.js hermes-setup
-export NIKECHAN_X_WORKER_HERMES_TOOLSETS=nikechan-x-worker,skills,memory
-export NIKECHAN_X_WORKER_HERMES_SKILLS=nikechan-x-self-tweet
+export NIKECHAN_X_WORKER_HERMES_TOOLSETS=nikechan-x-worker,skills,memory,x_search
+export NIKECHAN_X_WORKER_HERMES_SKILLS=nikechan-x-self-tweet,nikechan-x-trend-context
 hermes mcp test nikechan-x-worker
 ```
 
 If `hermes mcp add` reports `StdioServerParameters` as undefined, install the Python MCP SDK into the same Python environment that runs Hermes.
+
+For current trend/news-aware runs, enable Hermes xAI X Search with either stored xAI OAuth credentials or `XAI_API_KEY` in the worker environment. Hermes hides the `x_search` schema when no xAI credentials are available, so the worker falls back to loaded articles and public memory instead of inventing current news.
+
+`x_search` can take longer than normal memory-only generation. Use `NIKECHAN_X_WORKER_HERMES_TIMEOUT_MS=240000` or higher for news-aware production runs.
 
 The MCP server exposes read-only tools only:
 
@@ -154,11 +158,12 @@ Set `NIKECHAN_X_WORKER_CANONICAL_MEMORY=disabled` for isolated local tests.
 `read_self_tweet_context` gives Hermes the old xangi source-collector semantics through a narrow read-only interface:
 
 - presence design: X is a contact/recontact surface for an AI character whose memory, relationships, and activity range grow over time
-- source mode rotation: `presence`, `daily_life`, `tech`, `memory`, `random`
+- source mode rotation: `presence`, `daily_life`, `tech`, `news`, `memory`, `random`
 - used topics and recent presented-topic cooldown
 - recent Nikechan X posts where available
 - public presence digests and aggregate presence signal summaries
 - public episodes, notes, wiki topics, articles
+- Grok/X Search trend plan for `news` mode, focused on AI, AI agents, AI characters, AITuber/VTuber tooling, LLMs, and AI coding assistants
 - master public tweets as auxiliary context
 - tweet performance ranking. If `nikechan/scripts/db.sh tweet-metrics-ranking` returns human-readable text instead of JSON, the worker keeps it as loaded text context instead of treating Phase B context as failed
 - recent `twitter_run_state` for planning only
@@ -171,7 +176,7 @@ For three-candidate self-tweet runs, Hermes should avoid producing only AI codin
 
 ## Hermes Native Skills
 
-The self-tweet workflow calls Hermes CLI by default and preloads the Hermes skill `nikechan-x-self-tweet`.
+The self-tweet workflow calls Hermes CLI by default and preloads the Hermes skills `nikechan-x-self-tweet` and `nikechan-x-trend-context`.
 
 Hermes CLI oneshot can load skills and memory. Long-term skill maintenance is handled by Hermes' own skill and curator commands:
 

@@ -2,15 +2,22 @@
 set -eu
 
 HERMES_HOME="${HERMES_HOME:-/home/node/.hermes}"
-SKILL_NAME="${NIKECHAN_X_WORKER_HERMES_SKILLS:-nikechan-x-self-tweet}"
-SKILL_NAME="${SKILL_NAME%%,*}"
-SKILL_NAME="$(printf '%s' "$SKILL_NAME" | xargs)"
-SKILL_NAME="${SKILL_NAME:-nikechan-x-self-tweet}"
+SKILL_NAMES="${NIKECHAN_X_WORKER_HERMES_SKILLS:-nikechan-x-self-tweet,nikechan-x-trend-context}"
 
-mkdir -p "$HERMES_HOME/skills/$SKILL_NAME"
-if [ ! -f "$HERMES_HOME/skills/$SKILL_NAME/SKILL.md" ] && [ -f "/worker/skills/hermes/$SKILL_NAME/SKILL.md" ]; then
-  cp "/worker/skills/hermes/$SKILL_NAME/SKILL.md" "$HERMES_HOME/skills/$SKILL_NAME/SKILL.md"
-fi
+OLD_IFS="$IFS"
+IFS=","
+for SKILL_NAME in $SKILL_NAMES; do
+  IFS="$OLD_IFS"
+  SKILL_NAME="$(printf '%s' "$SKILL_NAME" | xargs)"
+  if [ -n "$SKILL_NAME" ]; then
+    mkdir -p "$HERMES_HOME/skills/$SKILL_NAME"
+    if [ ! -f "$HERMES_HOME/skills/$SKILL_NAME/SKILL.md" ] && [ -f "/worker/skills/hermes/$SKILL_NAME/SKILL.md" ]; then
+      cp "/worker/skills/hermes/$SKILL_NAME/SKILL.md" "$HERMES_HOME/skills/$SKILL_NAME/SKILL.md"
+    fi
+  fi
+  IFS=","
+done
+IFS="$OLD_IFS"
 
 cat > "$HERMES_HOME/config.yaml" <<EOF
 model:

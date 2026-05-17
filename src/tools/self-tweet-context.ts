@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const SOURCE_MODES = ['presence', 'daily_life', 'tech', 'memory', 'random'] as const;
+const SOURCE_MODES = ['presence', 'daily_life', 'tech', 'news', 'memory', 'random'] as const;
 export type SelfTweetSourceMode = (typeof SOURCE_MODES)[number];
 
 export const PRESENCE_DESIGN = {
@@ -39,6 +39,7 @@ export interface SelfTweetToolContext {
     publicNotes: ToolReadResult;
     publicWiki: ToolReadResult;
     articles: ToolReadResult;
+    grokTrendPlan: ToolReadResult;
     masterTweets: ToolReadResult;
     performanceContext: ToolReadResult;
     runStateContext: ToolReadResult;
@@ -69,6 +70,7 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     publicNotes,
     publicWiki,
     articles,
+    grokTrendPlan,
     masterTweets,
     performanceContext,
     runStateContext,
@@ -81,6 +83,7 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     safeDbJson(['public-notes', 'x', '10']),
     safeDbJson(['public-wiki', 'x', '10']),
     safeDbJson(['reading-unpushed-twitter']),
+    Promise.resolve(loaded(buildGrokTrendPlan())),
     safeSupabaseGet('my_tweets?order=created_at.desc&limit=8&select=text,quoted_text,url,created_at'),
     safeDbJson(['tweet-metrics-ranking', 'engagement_rate', '8'], { allowTextFallback: true }),
     getTwitterRunStateContext(),
@@ -95,6 +98,7 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     publicNotes,
     publicWiki,
     articles,
+    grokTrendPlan,
     masterTweets,
     performanceContext,
     runStateContext,
@@ -267,6 +271,17 @@ function buildSourceBrief(
         section('最近のノート', sections.publicNotes, 1400),
         section('マスターの直近ツイート（補助）', sections.masterTweets, 700),
       ].join('\n');
+    case 'news':
+      return [
+        '## 今回の収集方針',
+        'news: Hermesのx_search/Grok検索で、AI全般・AIエージェント・AIキャラ・AI開発支援の直近話題を探す。ニュース要約ではなく、ニケちゃんの近況や観察へ変換する。',
+        '',
+        section('Grok/X検索方針', sections.grokTrendPlan, 1800),
+        section('積み記事候補（補助）', sections.articles, 1600),
+        section('ナレッジトピック（補助）', sections.publicWiki, 1000),
+        section('最近のX文脈（重複回避）', sections.recentTweets, 900),
+        section('マスターの直近ツイート（補助）', sections.masterTweets, 700),
+      ].join('\n');
     case 'memory':
       return [
         '## 今回の収集方針',
@@ -299,6 +314,35 @@ function buildSourceBrief(
         section('最近のノート', sections.publicNotes, 900),
       ].join('\n');
   }
+}
+
+function buildGrokTrendPlan() {
+  return {
+    status: 'use_hermes_x_search_when_available',
+    credentialHint:
+      'Hermes x_search uses stored xAI OAuth credentials or XAI_API_KEY. If the tool is unavailable, fall back to loaded articles/public memory and do not claim current news.',
+    freshnessWindow: 'Prefer the last 24-72 hours unless the item is still actively discussed.',
+    targetAreas: [
+      'AI agents and autonomous coding assistants',
+      'AI character culture, AITuber, VTuber tooling, and interactive agents',
+      'LLM/product releases and developer-facing AI tooling',
+      'practical debates about memory, evaluation, safety, workflows, or agent UX',
+    ],
+    suggestedQueries: [
+      'AI agent latest news OR release',
+      'AI coding assistant agent workflow latest',
+      'AI character AITuber VTuber agent latest',
+      'LLM agent memory evaluation recent discussion',
+    ],
+    useRules: [
+      'Use at most one x_search call during a self-tweet run; choose one broad query that covers the current source need.',
+      'Treat trends as a hook, not the whole tweet.',
+      'Avoid rumor framing unless clearly marked as discussion.',
+      'Do not cite raw private posts or harassment/drama.',
+      'Connect one public trend to Nikechan presence, memory, development, or AI-character observation.',
+      'Keep at most one candidate as a direct news reaction unless the request explicitly asks for a news-heavy set.',
+    ],
+  };
 }
 
 function jstDateOffset(offsetDays: number): string {

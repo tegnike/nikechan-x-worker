@@ -75,12 +75,14 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
   const recent = input.memory.recallRecent('self-tweet', 12);
   const feedback = input.request.context?.feedback ?? null;
   const maxActions = clampMaxActions(input.request.constraints?.max_actions);
+  const sourceModeOverride = process.env.SELF_TWEET_SOURCE_MODE;
   return [
     'You are the Hermes Agent runtime for nikechan-x-worker.',
     'Use your native memory, preloaded Hermes skills, and learning loop. Return only strict JSON.',
     'When nikechan-x-worker MCP tools are available, use them as the preferred Phase B context source before deciding.',
     '',
     `Task: decide ${maxActions} ${input.request.mode} self-tweet candidate(s) for AI Nikechan on X.`,
+    `Requested source mode override: ${sourceModeOverride || 'auto'}.`,
     '',
     'Presence design contract:',
     JSON.stringify(PRESENCE_DESIGN, null, 2),
@@ -101,10 +103,14 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '- Prefer read_self_tweet_context for source mode, run-state, recent X context, topic cooldown, articles, and performance context.',
     '- Prefer read_public_memory for canonical public memory and provenance.',
     '- Prefer read_worker_experience and read_self_tweet_skill for local learning context.',
+    '- When read_self_tweet_context reports sourceMode "news", or this prompt says the requested source mode override is "news", you must attempt the Hermes x_search tool before finalizing if it is available.',
+    '- For news mode x_search, make at most one x_search call and gather current public topics around AI, AI agents, AI characters, AITuber/VTuber tooling, LLMs, and AI coding assistants.',
+    '- If x_search is unavailable or credentials are missing, fall back to loaded articles/public memory and explicitly avoid pretending to know current news.',
     '- Do not use terminal/file tools to inspect xangi internals when the MCP tools are available.',
     '- Treat twitter_run_state as operational planning context only; never quote raw operational records in tweetText.',
     '- Treat worker-local recent experience as cooldown/learning context, not as the main tweet source.',
     '- If any Phase B sections such as publicWiki, publicEpisodes, articles, recentTweets, or masterTweets are loaded, do not call Phase B context unavailable just because one section is empty or text-formatted.',
+    '- Current/trend material must be transformed into Nikechan voice. Do not write a detached news summary; connect the trend to Nikechan presence, memory, agent work, development, or AI-character culture.',
     '',
     'Autonomous improvement contract:',
     '- The user explicitly allows Hermes to improve tweet quality by updating its native skill.',
@@ -127,6 +133,7 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '- At most one candidate may reuse a repeated worker-experience topic such as recovery paths, fallback handling, or "next steps after failure".',
     '- At least one candidate should be grounded in public wiki, public episodes, articles, recent tweets, or master tweets rather than worker-local experience.',
     '- If returning 3 candidates, aim for this balance: one presence/current-activity candidate, one light interaction/recontact candidate, and one AI character experiment or memory/development candidate.',
+    '- In news mode, include one trend-aware candidate when x_search returns usable public context; at most one candidate should be a direct news reaction unless the request explicitly asks for a news-heavy set.',
     '- At most one candidate may be a pure implementation tip. Prefer "Nikechan is doing/learning/remembering/meeting" over abstract advice.',
     '- Avoid wording that would be annoying if repeated often, such as repeated declarations that Nikechan wants to be remembered or is expanding into many places.',
     '- For human-like presence, translate fatigue into AI-character embodiment such as CPU/machine heat, response afterglow, cache cooling, standby, or memory整理. Avoid plain human fatigue/sleep claims unless intentionally framed.',
@@ -212,7 +219,7 @@ function summarizeWorkerExperience(entries: HermesExperience[]): Record<string, 
 async function runHermesCli(prompt: string): Promise<string> {
   const command = process.env.NIKECHAN_X_WORKER_HERMES_COMMAND ?? 'hermes';
   const args = buildHermesArgs(prompt);
-  const timeout = Number(process.env.NIKECHAN_X_WORKER_HERMES_TIMEOUT_MS ?? 120000);
+  const timeout = Number(process.env.NIKECHAN_X_WORKER_HERMES_TIMEOUT_MS ?? 240000);
   try {
     const { stdout } = await execFileAsync(command, args, {
       cwd: process.cwd(),
@@ -238,9 +245,9 @@ function buildHermesArgs(prompt: string): string[] {
   if (provider) args.push('--provider', provider);
   const model = process.env.NIKECHAN_X_WORKER_HERMES_MODEL;
   if (model) args.push('--model', model);
-  const skills = process.env.NIKECHAN_X_WORKER_HERMES_SKILLS ?? 'nikechan-x-self-tweet';
+  const skills = process.env.NIKECHAN_X_WORKER_HERMES_SKILLS ?? 'nikechan-x-self-tweet,nikechan-x-trend-context';
   if (skills) args.push('--skills', skills);
-  const toolsets = process.env.NIKECHAN_X_WORKER_HERMES_TOOLSETS ?? 'nikechan-x-worker,skills,memory';
+  const toolsets = process.env.NIKECHAN_X_WORKER_HERMES_TOOLSETS ?? 'nikechan-x-worker,skills,memory,x_search';
   if (toolsets) args.push('--toolsets', toolsets);
   return args;
 }

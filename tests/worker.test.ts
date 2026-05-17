@@ -17,6 +17,9 @@ const ENV_KEYS = [
   'NIKECHAN_X_WORKER_SELF_TWEET_SKILL_PATH',
   'NIKECHAN_X_WORKER_HERMES_MODE',
   'NIKECHAN_X_WORKER_HERMES_COMMAND',
+  'NIKECHAN_X_WORKER_HERMES_SKILLS',
+  'NIKECHAN_X_WORKER_HERMES_TOOLSETS',
+  'SELF_TWEET_SOURCE_MODE',
   'HERMES_HOME',
   'NIKECHAN_X_WORKER_HERMES_SKILL_PATH',
   'NIKECHAN_X_WORKER_HERMES_SKILL_AUTOCOMMIT',
@@ -43,6 +46,9 @@ beforeEach(() => {
   delete process.env.NIKECHAN_X_WORKER_HERMES_SKILL_SNAPSHOT_PATH;
   delete process.env.NIKECHAN_X_WORKER_FIXTURE_MUTATE_SKILL;
   delete process.env.NIKECHAN_X_WORKER_HERMES_COMMAND;
+  delete process.env.NIKECHAN_X_WORKER_HERMES_SKILLS;
+  delete process.env.NIKECHAN_X_WORKER_HERMES_TOOLSETS;
+  delete process.env.SELF_TWEET_SOURCE_MODE;
   delete process.env.HERMES_HOME;
   process.env.NIKECHAN_X_WORKER_KILL_SWITCH = 'open';
   process.env.NIKECHAN_X_WORKER_X_KILL_SWITCH = 'open';
@@ -327,9 +333,22 @@ esac
 
   it('rotates self-tweet source mode from old xangi run-state semantics', () => {
     expect(chooseSourceMode({ mode: 'daily_life' })).toBe('tech');
-    expect(chooseSourceMode({ mode: 'tech' })).toBe('memory');
+    expect(chooseSourceMode({ mode: 'tech' })).toBe('news');
+    expect(chooseSourceMode({ mode: 'news' })).toBe('memory');
     expect(chooseSourceMode({ mode: 'memory' })).toBe('random');
     expect(chooseSourceMode({ mode: 'random' })).toBe('presence');
     expect(chooseSourceMode({ mode: 'presence' })).toBe('daily_life');
+  });
+
+  it('includes a Grok/X trend plan in news source mode', async () => {
+    process.env.NIKECHAN_DB_SH_PATH = join(process.cwd(), 'tests/fixtures/db.sh');
+    process.env.SELF_TWEET_SOURCE_MODE = 'news';
+
+    const context = await collectSelfTweetToolContext();
+
+    expect(context.sourceMode).toBe('news');
+    expect(context.sections.grokTrendPlan.status).toBe('loaded');
+    expect(JSON.stringify(context.sections.grokTrendPlan.data)).toContain('AI agents');
+    expect(context.sourceBrief).toContain('Grok/X検索方針');
   });
 });
