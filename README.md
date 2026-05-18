@@ -235,7 +235,7 @@ NIKECHAN_X_WORKER_HERMES_SKILL_SNAPSHOT_PATH=skills/hermes/nikechan-x-self-tweet
 
 Set `NIKECHAN_X_WORKER_HERMES_SKILL_AUTOCOMMIT=false` to disable git commits. The commit result is included in `WorkflowReport.audit.hermesSkill.snapshot`.
 
-Production deploy rebases `/opt/nikechan-x-worker` onto `origin/main`. If Hermes auto-committed skill snapshots on the VPS and the same rules were later committed upstream, duplicate snapshot commits may be skipped during conflict cleanup as long as their content is already present in `origin/main`.
+Production deploy is owned by the `nikechan-host` GitHub Actions workflow `Deploy xangi to VPS`. The workflow updates `/opt/nikechan-x-worker` to `origin/main` before building the Docker service. If Hermes changed only `skills/hermes/nikechan-x-self-tweet/SKILL.md` on the VPS, deploy stashes that local snapshot first. If stale cherry-pick or rebase state remains from a failed deploy, deploy aborts it and backs up the current worker HEAD to a `deploy-backup/hermes-worker-*` branch before aligning with `origin/main`.
 
 ## Discord revision loop
 

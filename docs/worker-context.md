@@ -92,7 +92,7 @@ The worker intentionally enables Hermes `skills` and `memory` toolsets alongside
 
 When Hermes changes the native skill, the worker snapshots the skill into `skills/hermes/nikechan-x-self-tweet/SKILL.md` and can commit that snapshot in the worker repository. The native Hermes skill remains the runtime source; the repository snapshot is for review, deployment traceability, and rollback.
 
-If production Hermes snapshot commits conflict with an upstream commit that already contains the same skill rules, skip the duplicate VPS commits during deploy cleanup and keep `origin/main` as the canonical repository state.
+Production deploy is driven by the parent `nikechan-host` workflow. The VPS checkout under `/opt/nikechan-x-worker` is treated as deploy state, not the canonical repo: if Hermes changed only the self-tweet skill snapshot, deploy stashes it; if stale cherry-pick or rebase state remains, deploy aborts it; if local commits remain, deploy backs up the current HEAD to `deploy-backup/hermes-worker-*` and aligns the checkout with `origin/main`.
 
 Set `NIKECHAN_X_WORKER_HERMES_MODE=local-fallback` only for local scaffold tests when Hermes is not installed. That mode does not exercise Hermes native memory, native skills, or the learning loop.
 
