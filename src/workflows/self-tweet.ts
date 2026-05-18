@@ -12,6 +12,7 @@ import { collectSelfTweetCanonicalMemory } from '../memory/canonical-memory.js';
 import { HermesMemoryStore } from '../memory/hermes-memory.js';
 import { loadSelfTweetSkill } from '../skills/self-tweet-skill.js';
 import { readFeedbackInput, recordOperatorFeedback } from '../skills/skill-proposals.js';
+import { collectSelfTweetToolContext } from '../tools/self-tweet-context.js';
 
 export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<WorkflowReport> {
   const createdAt = new Date().toISOString();
@@ -20,7 +21,10 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
   const memory = new HermesMemoryStore();
   const agent = createHermesRuntime();
   const killSwitch = readKillSwitchState();
-  const canonicalMemory = await collectSelfTweetCanonicalMemory();
+  const [canonicalMemory, selfTweetContext] = await Promise.all([
+    collectSelfTweetCanonicalMemory(),
+    collectSelfTweetToolContext(),
+  ]);
   const skill = loadSelfTweetSkill();
   const hermesSkillBefore = readHermesSelfTweetSkillSnapshot();
   const feedbackInput = readFeedbackInput(request.context);
@@ -36,6 +40,7 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
       request,
       core,
       canonicalMemory,
+      selfTweetContext,
       skill,
       memory,
     });
@@ -62,7 +67,11 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
   hermesSkillAudit.snapshot = snapshotHermesSkillToGit(hermesSkillAudit, request);
   const candidateEgress = decision.candidates.map((candidate) => ({
     candidate,
-    egress: checkTweetEgress(candidate.tweetText),
+    egress: checkTweetEgress({
+      tweetText: candidate.tweetText,
+      topic: candidate.topic,
+      reasoning: candidate.reasoning,
+    }),
   }));
   const killSwitchBlocked = killSwitch.global === 'closed' || killSwitch.surface === 'closed';
   const guardBlocked = killSwitchBlocked;

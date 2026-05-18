@@ -3,6 +3,7 @@ import type { MemoryProposal, SkillProposal, WorkflowRequest } from '../contract
 import type { CanonicalMemorySnapshot } from '../memory/canonical-memory.js';
 import type { HermesExperience, HermesMemoryStore } from '../memory/hermes-memory.js';
 import type { SelfTweetSkill } from '../skills/self-tweet-skill.js';
+import type { SelfTweetToolContext } from '../tools/self-tweet-context.js';
 
 export type HermesRuntimeMode = 'cli' | 'local-fallback';
 
@@ -41,6 +42,7 @@ export interface HermesDecisionInput {
   request: WorkflowRequest;
   core: NikechanCoreContext | null;
   canonicalMemory: CanonicalMemorySnapshot;
+  selfTweetContext: SelfTweetToolContext;
   skill: SelfTweetSkill;
   memory: HermesMemoryStore;
 }

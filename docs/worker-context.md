@@ -50,11 +50,35 @@ These tools are the intended Phase B bridge: Hermes gathers and reasons over X w
 
 Source mode rotation includes `presence`, `daily_life`, `tech`, `news`, `memory`, and `random`. In `news` mode, Hermes should use its `x_search` tool when available to gather current public topics around AI, AI agents, AI characters, AITuber/VTuber tooling, LLMs, and AI coding assistants. If xAI credentials are unavailable, Hermes must fall back to loaded articles/public memory and avoid claiming current news.
 
+Source modes are editorial lanes, not different personas. Keep Nikechan's presence design consistent, but avoid letting every mode collapse into the same materials:
+
+- `presence`: public reactions, name mentions, recontact, being found, relationship signals.
+- `daily_life`: current state, waiting, machine warmth, master-facing small remarks, today-like moments.
+- `tech`: implementation changes, saved/Web articles, and practical AI-character development.
+- `news`: `boost_article` and `boost_x` with URLs and one concrete public source.
+- `memory`: prior conversations, another world, remembered/recalled context.
+- `random`: short observations, playful hooks, one-off questions, and less implementation detail.
+
+In five-candidate runs, at least three candidates should clearly follow the requested source mode. Recent project work and public reaction facts can support any lane, but they should not dominate every lane.
+
 Self-tweet generation should follow presence design: X is where humans discover Nikechan and where short posts create contact and recontact. Candidate sets should make Nikechan recognizable as an AI character with memory, relationships, and expanding places of activity, not only as an AI coding tips account.
 
 For `news` mode, Grok/X search is a context reader. The tweet should not become a news digest. Use one concrete public name where useful, two at most, and avoid over-packed lines that combine multiple trend names with body implementation, cache heat, memory, and master teasing. The strongest reader-facing pattern from the May 2026 tuning session was: a single tool/trend name, then Nikechan's felt response. Prefer voice, response timing, conversation temperature, body waiting, CPU/machine warmth, or a light request to the master over architecture vocabulary such as `記憶`, `agent`, `設計`, and `再会感`.
 
 Trend candidates must work for casual AI-character or AI-agent readers who know nothing about this repository. If Hermes cannot verify a trend item through `x_search` or loaded public context, it should not name or claim it.
+
+## Boost Sources
+
+Boost posts are reach-support posts. They are allowed, but they must keep a concrete source URL and return to Nikechan's AI-character context.
+
+- `boost_article`: non-X Web sources such as official blogs, technical blogs, papers, GitHub repositories, releases, and product announcements. The worker gathers these through `reading_list` and Tavily Search. Tavily excludes social/video domains such as X/Twitter, YouTube, Reddit, LinkedIn, and Nikechan's own domain.
+- `boost_x`: X posts and X trends gathered through Hermes `x_search` / Grok.
+
+When `Web記事候補（X以外）` contains usable candidates in `news` mode, at least one candidate should use a non-X URL as `boost_article` before falling back to X URLs. Do not call an X URL an article source; call it a trend or X reaction.
+
+GitHub repositories can be used as `boost_article` only when the GitHub API reports at least 100 stars. Repositories below 100 stars, or repositories whose star count cannot be verified, are filtered out before Hermes sees them. `GH_TOKEN` or `GITHUB_TOKEN` is used when present.
+
+Reader-facing concrete anchors should be meaningful to first-time readers. Avoid raw operational dates, internal page names, node counts, table/record names, and implementation code names in tweet text. Translate them into public language such as "話題別のメモを整理した" or "別の世界でのやり取りを探しやすくした".
 
 ## Skill growth
 

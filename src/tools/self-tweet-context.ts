@@ -39,8 +39,11 @@ export interface SelfTweetToolContext {
     publicNotes: ToolReadResult;
     publicWiki: ToolReadResult;
     articles: ToolReadResult;
+    webArticles: ToolReadResult;
     grokTrendPlan: ToolReadResult;
     masterTweets: ToolReadResult;
+    recentProjectWork: ToolReadResult;
+    recentPublicReactionFacts: ToolReadResult;
     performanceContext: ToolReadResult;
     runStateContext: ToolReadResult;
   };
@@ -70,8 +73,11 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     publicNotes,
     publicWiki,
     articles,
+    webArticles,
     grokTrendPlan,
     masterTweets,
+    recentProjectWork,
+    recentPublicReactionFacts,
     performanceContext,
     runStateContext,
   ] = await Promise.all([
@@ -83,8 +89,11 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     safeDbJson(['public-notes', 'x', '10']),
     safeDbJson(['public-wiki', 'x', '10']),
     safeDbJson(['reading-unpushed-twitter']),
+    safeWebArticleSearch(),
     Promise.resolve(loaded(buildGrokTrendPlan())),
     safeSupabaseGet('my_tweets?order=created_at.desc&limit=8&select=text,quoted_text,url,created_at'),
+    safeRecentProjectWork(),
+    safeRecentPublicReactionFacts(),
     safeDbJson(['tweet-metrics-ranking', 'engagement_rate', '8'], { allowTextFallback: true }),
     getTwitterRunStateContext(),
   ]);
@@ -98,8 +107,11 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
     publicNotes,
     publicWiki,
     articles,
+    webArticles,
     grokTrendPlan,
     masterTweets,
+    recentProjectWork,
+    recentPublicReactionFacts,
     performanceContext,
     runStateContext,
   };
@@ -181,6 +193,236 @@ async function safeRecentTweets(): Promise<ToolReadResult> {
   return safeDbJson(['tweet-metrics-ranking', 'engagement_rate', '8'], { allowTextFallback: true });
 }
 
+async function safeRecentProjectWork(): Promise<ToolReadResult> {
+  const cutoff = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  return safeSupabaseGet(
+    [
+      `codex_project_work_logs?period_end=gte.${encodeURIComponent(cutoff)}`,
+      'public_summary=not.is.null',
+      'order=period_end.desc',
+      'limit=8',
+      'select=project_key,period_start,period_end,status,public_summary,concrete_changes,next_steps',
+    ].join('&')
+  );
+}
+
+async function safeRecentPublicReactionFacts(): Promise<ToolReadResult> {
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const result = await safeSupabaseGet(
+    [
+      `tweet_logs?posted_at=gte.${encodeURIComponent(cutoff)}`,
+      'type=in.(reply,quote,mention,hashtag)',
+      'order=posted_at.desc',
+      'limit=30',
+      'select=type,body,hashtags,posted_at,nikechan_action,checked_by_nikechan',
+    ].join('&')
+  );
+  if (result.status !== 'loaded') return result;
+  if (!Array.isArray(result.data)) return loaded([]);
+  return loaded(buildReactionFacts(result.data));
+}
+
+interface WebArticleCandidate {
+  source: 'tavily';
+  query: string;
+  title: string;
+  url: string;
+  domain: string;
+  summary: string;
+  score?: number;
+  publishedDate?: string;
+  githubStars?: number;
+}
+
+async function safeWebArticleSearch(): Promise<ToolReadResult> {
+  if (process.env.NIKECHAN_X_WORKER_WEB_ARTICLE_SEARCH === 'false') {
+    return unavailable('web article search disabled');
+  }
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) return unavailable('TAVILY_API_KEY missing for web article search');
+
+  try {
+    const queries = webArticleQueries();
+    const responses = await Promise.all(queries.map((query) => searchTavilyArticles(key, query)));
+    const candidates = (await filterWebArticleCandidates(dedupeWebArticles(responses.flat()))).slice(0, 8);
+    return loaded({
+      source: 'tavily',
+      usage:
+        'X/Twitter検索とは別のWeb記事候補。tweet本文に使う場合は必ずURLを含め、ニュース要約ではなくニケちゃん文脈へ接続する。',
+      excludeDomains: TAVILY_EXCLUDED_DOMAINS,
+      candidates,
+    });
+  } catch (error) {
+    return unavailable(`web article search failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+const TAVILY_EXCLUDED_DOMAINS = [
+  'x.com',
+  'twitter.com',
+  'mobile.twitter.com',
+  't.co',
+  'fxtwitter.com',
+  'vxtwitter.com',
+  'nitter.net',
+  'bsky.app',
+  'threads.net',
+  'facebook.com',
+  'instagram.com',
+  'linkedin.com',
+  'reddit.com',
+  'youtube.com',
+  'youtu.be',
+  'nikechan.com',
+] as const;
+
+function webArticleQueries(): string[] {
+  const override = process.env.NIKECHAN_X_WORKER_WEB_ARTICLE_QUERIES;
+  if (override) {
+    const queries = override
+      .split('\n')
+      .flatMap((line) => line.split('|'))
+      .map((query) => query.trim())
+      .filter(Boolean);
+    if (queries.length) return queries.slice(0, 3);
+  }
+  return [
+    'AI agent memory official blog paper',
+    'AI coding assistant workflow official blog release',
+    'AI VTuber AITuber character agent blog',
+  ];
+}
+
+async function searchTavilyArticles(key: string, query: string): Promise<WebArticleCandidate[]> {
+  const timeout = Number(process.env.NIKECHAN_X_WORKER_WEB_SEARCH_TIMEOUT_MS ?? 12000);
+  const body: Record<string, unknown> = {
+    query,
+    search_depth: 'basic',
+    topic: 'general',
+    max_results: Number(process.env.NIKECHAN_X_WORKER_WEB_ARTICLE_MAX_RESULTS ?? 5),
+    include_answer: false,
+    include_raw_content: false,
+    include_images: false,
+    include_favicon: false,
+    exclude_domains: TAVILY_EXCLUDED_DOMAINS,
+  };
+  const timeRange = process.env.NIKECHAN_X_WORKER_WEB_ARTICLE_TIME_RANGE;
+  if (timeRange) body.time_range = timeRange;
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!res.ok) {
+    throw new Error(`Tavily search failed: ${res.status} ${await res.text()}`);
+  }
+  const json = (await res.json()) as { results?: unknown };
+  return Array.isArray(json.results)
+    ? json.results.flatMap((entry) => tavilyResultToCandidate(query, entry))
+    : [];
+}
+
+function tavilyResultToCandidate(query: string, input: unknown): WebArticleCandidate[] {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return [];
+  const record = input as Record<string, unknown>;
+  const url = readRecordString(record, 'url');
+  const title = readRecordString(record, 'title');
+  if (!url || !title || isExcludedArticleUrl(url)) return [];
+  const summary = readRecordString(record, 'content') || '';
+  const score = typeof record.score === 'number' ? record.score : undefined;
+  const publishedDate = readRecordString(record, 'published_date');
+  return [
+    {
+      source: 'tavily',
+      query,
+      title,
+      url,
+      domain: hostnameOf(url),
+      summary: truncateBlock(summary, 420),
+      score,
+      publishedDate,
+    },
+  ];
+}
+
+function dedupeWebArticles(candidates: WebArticleCandidate[]): WebArticleCandidate[] {
+  const seen = new Set<string>();
+  const deduped: WebArticleCandidate[] = [];
+  for (const candidate of candidates.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))) {
+    const normalized = candidate.url.replace(/[#?].*$/u, '');
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    deduped.push(candidate);
+  }
+  return deduped;
+}
+
+async function filterWebArticleCandidates(
+  candidates: WebArticleCandidate[]
+): Promise<WebArticleCandidate[]> {
+  const filtered: WebArticleCandidate[] = [];
+  for (const candidate of candidates) {
+    const githubRepo = parseGithubRepo(candidate.url);
+    if (!githubRepo) {
+      filtered.push(candidate);
+      continue;
+    }
+    const stars = await fetchGithubStars(githubRepo);
+    if (stars === null || stars < 100) continue;
+    filtered.push({ ...candidate, githubStars: stars });
+  }
+  return filtered;
+}
+
+function parseGithubRepo(url: string): { owner: string; repo: string } | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.replace(/^www\./u, '') !== 'github.com') return null;
+    const [owner, repo] = parsed.pathname.split('/').filter(Boolean);
+    if (!owner || !repo || owner === 'topics') return null;
+    return { owner, repo: repo.replace(/\.git$/u, '') };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchGithubStars(repo: { owner: string; repo: string }): Promise<number | null> {
+  try {
+    const headers: Record<string, string> = {
+      accept: 'application/vnd.github+json',
+      'user-agent': 'nikechan-x-worker',
+    };
+    const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+    if (token) headers.authorization = `Bearer ${token}`;
+    const res = await fetch(`https://api.github.com/repos/${repo.owner}/${repo.repo}`, {
+      headers,
+      signal: AbortSignal.timeout(Number(process.env.NIKECHAN_X_WORKER_GITHUB_TIMEOUT_MS ?? 5000)),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { stargazers_count?: unknown };
+    return typeof json.stargazers_count === 'number' ? json.stargazers_count : null;
+  } catch {
+    return null;
+  }
+}
+
+function isExcludedArticleUrl(url: string): boolean {
+  const host = hostnameOf(url);
+  return TAVILY_EXCLUDED_DOMAINS.some((domain) => host === domain || host.endsWith(`.${domain}`));
+}
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./u, '');
+  } catch {
+    return '';
+  }
+}
+
 async function safeDbJson(
   args: string[],
   options: { allowTextFallback?: boolean } = {}
@@ -247,15 +489,19 @@ function buildSourceBrief(
 ): string {
   const section = (title: string, result: ToolReadResult, max: number) =>
     [`## ${title}`, truncateBlock(JSON.stringify(result.data, null, 2), max), ''].join('\n');
+  const projectWork = projectWorkSection(sections.recentProjectWork, 1800);
+  const publicReactionFacts = publicReactionFactsSection(sections.recentPublicReactionFacts, 1600);
 
   switch (sourceMode) {
     case 'presence':
       return [
         '## 今回の収集方針',
-        'presence: ニケちゃんの存在感、生活圏の広がり、関係の芽、再接触の呼び水を優先する。技術Tips単体ではなく、AIキャラとしての近況や成長に接続する。',
+        'presence: 主役は公開反応、名前呼び、再接触、見つけてもらえた事実、関係の芽。作業ログは補助に留め、記事・ニュース解説は原則主役にしない。',
         '',
         section('存在感設計', loaded(PRESENCE_DESIGN), 1600),
         section('公開presence digest', sections.presenceDigests, 2200),
+        projectWork,
+        publicReactionFacts,
         section('presence signal集計', sections.presenceSignalSummary, 1400),
         section('当日のエピソード', sections.publicEpisodes, 1200),
         section('最近のX文脈', sections.recentTweets, 800),
@@ -263,9 +509,12 @@ function buildSourceBrief(
     case 'tech':
       return [
         '## 今回の収集方針',
-        'tech: 積み記事、ナレッジ、ノートを優先する。マスター近況や当日エピソードは補助情報として扱う。',
+        'tech: 主役は実装で何が変わったか、Web記事候補、積み記事、AIキャラ開発の実例。名前呼びや別世界メモは補助に留める。外部記事を使う場合はURL必須で、ニケちゃんに何ができるようになるかへ接続する。',
         '',
+        section('Web記事候補（X以外）', sections.webArticles, 2400),
         section('積み記事候補', sections.articles, 2600),
+        projectWork,
+        publicReactionFacts,
         section('ナレッジトピック', sections.publicWiki, 2000),
         section('公開presence digest（補助）', sections.presenceDigests, 900),
         section('最近のノート', sections.publicNotes, 1400),
@@ -274,9 +523,12 @@ function buildSourceBrief(
     case 'news':
       return [
         '## 今回の収集方針',
-        'news: Hermesのx_search/Grok検索で、AI全般・AIエージェント・AIキャラ・AI開発支援の直近話題を探す。ニュース要約ではなく、ニケちゃんの近況や観察へ変換する。',
+        'news: 主役はboost_articleまたはboost_x。Web記事候補とHermesのx_search/Grok検索で、AI全般・AIエージェント・AIキャラ・AI開発支援の直近話題を探す。X投稿だけに偏らず、URL付きの外部話題をニケちゃんの近況や観察へ変換する。',
         '',
+        section('Web記事候補（X以外）', sections.webArticles, 2400),
         section('Grok/X検索方針', sections.grokTrendPlan, 1800),
+        projectWork,
+        publicReactionFacts,
         section('積み記事候補（補助）', sections.articles, 1600),
         section('ナレッジトピック（補助）', sections.publicWiki, 1000),
         section('最近のX文脈（重複回避）', sections.recentTweets, 900),
@@ -285,8 +537,10 @@ function buildSourceBrief(
     case 'memory':
       return [
         '## 今回の収集方針',
-        'memory: 記憶、関係性、過去作業の変化を優先する。単なる当日近況には寄せすぎない。',
+        'memory: 主役は前に話したこと、別の世界、思い出し、会話の続き。作業ログや外部記事は補助に留め、単なる当日近況には寄せすぎない。',
         '',
+        projectWork,
+        publicReactionFacts,
         section('当日のエピソード', sections.publicEpisodes, 2400),
         section('公開presence digest', sections.presenceDigests, 1600),
         section('ナレッジトピック', sections.publicWiki, 2000),
@@ -295,8 +549,10 @@ function buildSourceBrief(
     case 'random':
       return [
         '## 今回の収集方針',
-        'random: 特定ソースに縛られない自然発想を優先する。記事・ニュース解説ではなく、短い観察、ボケ、問い、日常の一点反応を作る。',
+        'random: 主役は短い観察、軽いボケ、反応しやすい一言、日常の一点反応。作業ログ・名前呼び・別世界メモに寄せすぎず、記事・ニュース解説は原則主役にしない。',
         '',
+        projectWork,
+        publicReactionFacts,
         section('最近のノート', sections.publicNotes, 1100),
         section('公開presence digest', sections.presenceDigests, 1200),
         section('ナレッジトピック', sections.publicWiki, 900),
@@ -306,14 +562,212 @@ function buildSourceBrief(
     default:
       return [
         '## 今回の収集方針',
-        'daily_life: 日々の出来事を扱う。ただしマスター近況だけに偏らず、ノートや公開メモも混ぜる。',
+        'daily_life: 主役は待機中の状態、マシンの熱、マスターへの軽い一言、今日の小さな出来事。作業ログは「今日の状態」に翻訳し、技術説明や外部記事は主役にしない。',
         '',
+        projectWork,
+        publicReactionFacts,
         section('当日のエピソード', sections.publicEpisodes, 1800),
         section('公開presence digest', sections.presenceDigests, 1400),
         section('マスターの直近ツイート', sections.masterTweets, 1300),
         section('最近のノート', sections.publicNotes, 900),
       ].join('\n');
   }
+}
+
+interface ReactionFact {
+  kind: string;
+  volume: 'single' | 'several' | 'many';
+  topics: string[];
+  example_summary: string;
+  tweet_use: string;
+}
+
+interface ReactionBucket {
+  kind: string;
+  items: Array<{ body: string; topics: string[] }>;
+}
+
+function buildReactionFacts(rows: unknown[]): ReactionFact[] {
+  const buckets = new Map<string, ReactionBucket>();
+  for (const row of rows) {
+    const item = toReactionItem(row);
+    if (!item) continue;
+    const existing = buckets.get(item.kind) || { kind: item.kind, items: [] };
+    existing.items.push({ body: item.body, topics: item.topics });
+    buckets.set(item.kind, existing);
+  }
+  return Array.from(buckets.values())
+    .map((bucket) => bucketToReactionFact(bucket))
+    .filter((fact): fact is ReactionFact => fact !== null)
+    .slice(0, 4);
+}
+
+function toReactionItem(input: unknown): { kind: string; body: string; topics: string[] } | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const record = input as Record<string, unknown>;
+  const body = readRecordString(record, 'body') || '';
+  const type = readRecordString(record, 'type') || 'reaction';
+  const hashtags = readStringArray(record.hashtags);
+  const cleaned = cleanPublicReactionText(body);
+  if (!cleaned) return null;
+
+  const mentionsNikechan =
+    /AIニケちゃん|@ai_nikechan|#AIニケちゃん/iu.test(body) ||
+    hashtags.some((tag) => /AIニケちゃん/iu.test(tag));
+  const isDirect = ['reply', 'quote', 'mention'].includes(type);
+  if (!mentionsNikechan && !isDirect) return null;
+
+  return {
+    kind: classifyReactionKind(type, body, hashtags),
+    body: cleaned,
+    topics: reactionTopics(body, hashtags),
+  };
+}
+
+function bucketToReactionFact(bucket: ReactionBucket): ReactionFact | null {
+  if (!bucket.items.length) return null;
+  const topics = uniqueStrings(bucket.items.flatMap((item) => item.topics)).slice(0, 4);
+  return {
+    kind: bucket.kind,
+    volume: volumeLabel(bucket.items.length),
+    topics,
+    example_summary: summarizeReactionExample(bucket.kind, bucket.items[0]?.body || '', topics),
+    tweet_use: reactionTweetUse(bucket.kind),
+  };
+}
+
+function publicReactionFactsSection(result: ToolReadResult, max: number): string {
+  if (result.status !== 'loaded') {
+    return ['## 直近の公開反応', `取得不可: ${result.error || 'unknown error'}`, ''].join('\n');
+  }
+  if (!Array.isArray(result.data) || result.data.length === 0) {
+    return ['## 直近の公開反応', '直近48時間の投稿素材にできる公開反応はありません。', ''].join('\n');
+  }
+
+  const lines = [
+    '## 直近の公開反応',
+    'tweet本文では件数を原則出さず、届いた反応の種類・話題・次にどう扱うかだけを使う。',
+  ];
+  for (const fact of result.data.slice(0, 4)) {
+    if (!fact || typeof fact !== 'object' || Array.isArray(fact)) continue;
+    const record = fact as Record<string, unknown>;
+    const kind = readRecordString(record, 'kind') || '公開反応';
+    const topics = readStringArray(record.topics).join(' / ') || '話題未分類';
+    const example = readRecordString(record, 'example_summary');
+    const use = readRecordString(record, 'tweet_use');
+    lines.push(`- ${kind}: ${topics}`);
+    if (example) lines.push(`  例: ${example}`);
+    if (use) lines.push(`  使い方: ${use}`);
+  }
+  return `${truncateBlock(lines.join('\n'), max)}\n`;
+}
+
+function classifyReactionKind(type: string, body: string, hashtags: string[]): string {
+  if (type === 'reply') return '返信';
+  if (type === 'quote') return '引用';
+  if (type === 'mention') return '名前呼び';
+  if (/(ファンアート|イラスト|絵|創作|動画|作品|Veo|GPTimage|顔を出して|贈る|ことばの日|今日は創作の日)/iu.test(body)) {
+    return '創作投稿';
+  }
+  if (hashtags.some((tag) => /AIニケちゃん/iu.test(tag))) return '名前呼び';
+  return '公開反応';
+}
+
+function reactionTopics(body: string, hashtags: string[]): string[] {
+  const topics = [];
+  const text = `${body} ${hashtags.join(' ')}`;
+  if (/ことばの日|言葉の日/iu.test(text)) topics.push('ことばの日');
+  if (/今日は創作の日|創作/iu.test(text)) topics.push('創作');
+  if (/動画|Veo|GPTimage|生成AI動画/iu.test(text)) topics.push('生成AI動画');
+  if (/別の世界|再会|どちら様|覚え|記憶/iu.test(text)) topics.push('別世界での再会と記憶');
+  if (/AIニケちゃん|#AIニケちゃん|@ai_nikechan/iu.test(text)) topics.push('AIニケちゃんの名前呼び');
+  if (!topics.length) topics.push(cleanPublicReactionText(body).slice(0, 40));
+  return uniqueStrings(topics);
+}
+
+function summarizeReactionExample(kind: string, body: string, topics: string[]): string {
+  if (topics.includes('別世界での再会と記憶')) {
+    return '別の世界で会ったときに記憶が途切れる寂しさへの反応';
+  }
+  if (kind === '創作投稿') {
+    return `${topics.slice(0, 2).join(' / ') || '創作'}の文脈で名前が混ざっていた`;
+  }
+  if (kind === '返信') return cleanPublicReactionText(body).slice(0, 70);
+  if (kind === '名前呼び') return 'タグや本文で名前を呼ばれていた';
+  return cleanPublicReactionText(body).slice(0, 70);
+}
+
+function reactionTweetUse(kind: string): string {
+  if (kind === '返信') return '反応への直接返信ではなく、記憶や再会について考えた近況にする。';
+  if (kind === '創作投稿') return '作品や創作の中に名前が混ざった事実を、具体的な近況として扱う。';
+  if (kind === '名前呼び') return '呼ばれた場所やタグを、見つけてもらえた近況として扱う。';
+  if (kind === '引用') return '外から見たニケちゃん像への短い気づきにする。';
+  return '反応ログを見て、次に話す文脈を選ぶ近況にする。';
+}
+
+function volumeLabel(count: number): 'single' | 'several' | 'many' {
+  if (count <= 1) return 'single';
+  if (count <= 4) return 'several';
+  return 'many';
+}
+
+function cleanPublicReactionText(text: string): string {
+  return text
+    .replace(/https?:\/\/\S+/giu, '')
+    .replace(/@\w+/giu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+function uniqueStrings(items: string[]): string[] {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+}
+
+function projectWorkSection(result: ToolReadResult, max: number): string {
+  if (result.status !== 'loaded') {
+    return ['## 直近の開発近況', `取得不可: ${result.error || 'unknown error'}`, ''].join('\n');
+  }
+  if (!Array.isArray(result.data) || result.data.length === 0) {
+    return ['## 直近の開発近況', '直近6時間の保存済み開発近況はありません。', ''].join('\n');
+  }
+
+  const grouped = new Map<string, unknown[]>();
+  for (const row of result.data.slice(0, 8)) {
+    const key = readRecordString(row, 'project_key') || 'project';
+    grouped.set(key, [...(grouped.get(key) || []), row]);
+  }
+
+  const lines = ['## 直近の開発近況'];
+  for (const [key, rows] of grouped) {
+    lines.push(`### ${projectWorkLabel(key)}`);
+    for (const row of rows.slice(0, 3)) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+      const record = row as Record<string, unknown>;
+      const summary = readRecordString(record, 'public_summary');
+      const changes = readStringArray(record.concrete_changes).slice(0, 2);
+      const nextSteps = readStringArray(record.next_steps).slice(0, 1);
+      if (summary) lines.push(`- ${summary}`);
+      if (changes.length) lines.push(`  具体: ${changes.join(' / ')}`);
+      if (nextSteps.length) lines.push(`  次: ${nextSteps.join(' / ')}`);
+    }
+  }
+  return `${truncateBlock(lines.join('\n'), max)}\n`;
+}
+
+function projectWorkLabel(key: string): string {
+  const labels: Record<string, string> = {
+    nikechan: '運用基盤',
+    'nikechan-x-worker': 'X投稿ワーカー',
+    'nikechan-blog': 'ブログ',
+    'aituber-kit': 'AITuberKit',
+  };
+  return labels[key] || key;
+}
+
+function readStringArray(input: unknown): string[] {
+  return Array.isArray(input)
+    ? input.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
 }
 
 function buildGrokTrendPlan() {

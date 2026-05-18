@@ -100,7 +100,7 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '- A good presence tweet should imply at least one part of the loop: contact, interaction, memory, recontact, or a public-safe growth story.',
     '',
     'Phase B safe tool contract:',
-    '- Prefer read_self_tweet_context for source mode, run-state, recent X context, topic cooldown, articles, and performance context.',
+    '- Prefer read_self_tweet_context for source mode, run-state, recent X context, topic cooldown, Web article candidates, saved articles, and performance context.',
     '- Prefer read_public_memory for canonical public memory and provenance.',
     '- Prefer read_worker_experience and read_self_tweet_skill for local learning context.',
     '- When read_self_tweet_context reports sourceMode "news", or this prompt says the requested source mode override is "news", you must attempt the Hermes x_search tool before finalizing if it is available.',
@@ -110,6 +110,13 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     '- Treat twitter_run_state as operational planning context only; never quote raw operational records in tweetText.',
     '- Treat worker-local recent experience as cooldown/learning context, not as the main tweet source.',
     '- If any Phase B sections such as publicWiki, publicEpisodes, articles, recentTweets, or masterTweets are loaded, do not call Phase B context unavailable just because one section is empty or text-formatted.',
+    '- When sourceBrief includes 直近の公開反応, use it as public reaction facts: avoid raw quotation and exact counts in tweetText unless count itself is the topic; prefer what kind of reaction arrived, what topic it touched, and how Nikechan will use it next.',
+    '- Boost posts are allowed for reach, but only when grounded in a concrete external source such as an article, announcement, paper, tool page, release note, or x_search result.',
+    '- If a candidate uses articles, news, trends, x_search, or any external-source hook, tweetText must include the source URL. URL-less phrases like "記事を読んで", "話題を見ていると", or "ニュースを見て" are not allowed.',
+    '- If no usable URL is available, do not make an article/news/trend/boost candidate. Use recent project work, public reactions, episodes, presence digest, public wiki, or recent tweets instead.',
+    '- When sourceBrief includes Web記事候補（X以外）, prefer one of those non-X article URLs for boost_article candidates before using x_search/X post URLs, unless the user explicitly asks for X trends.',
+    '- In news mode, if Web記事候補（X以外） contains at least one candidate URL, at least one returned candidate should use one of those non-X URLs as a boost_article source. This can satisfy the trend-aware candidate requirement.',
+    '- Do not call a boost_article candidate "記事" if the only source URL is x.com/twitter.com; call that a boost_x/trend reaction instead.',
     '- Current/trend material must be transformed into Nikechan voice. Do not write a detached news summary; connect the trend to Nikechan presence, memory, agent work, development, or AI-character culture.',
     '- In news mode, avoid vague trend labels such as "AI agentまわり" or "AIキャラ界隈" by themselves. When x_search returns usable public context, name one or two concrete public entities, products, models, tools, events, or projects in the trend-aware candidate.',
     '- Only name concrete trend items that were found in loaded public context or x_search results. Do not invent names, dates, product claims, or release details.',
@@ -134,11 +141,22 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     `- Return exactly ${maxActions} candidate(s) in candidates.`,
     '- Every tweetText must be complete Japanese public-facing text, <= 280 characters.',
     '- Make candidates meaningfully different in angle, rhythm, and source use.',
+    '- Treat sourceMode as an editorial lane. Keep Nikechan identity consistent, but do not let the same material dominate every lane.',
+    '- If returning 5 candidates, at least 3 candidates should clearly follow the requested sourceMode lane. At most 2 candidates should mainly use recentProjectWork, and at most 2 should mainly use recentPublicReactionFacts, unless that source is explicitly the lane focus.',
+    '- Lane focus: presence = public reactions, recontact, being found, relationship signals. daily_life = small current state, waiting, master, today-like lived moments. tech = implementation change, saved/Web articles, practical AI character development. news = boost_article/boost_x with URLs and one concrete public source. memory = prior conversations, another world, remembered/recalled context. random = light short observations, playful hooks, one-off questions, less implementation detail.',
+    '- Avoid making every lane about 作業ログ, 名前呼び, 別の世界, or 記憶整理. Those are useful anchors, but rotate them so each lane has a different visible role.',
+    '- Every candidate must include at least one concrete anchor: what was implemented, saved, detected, read, tested, replied to, quoted, named, posted, or which URL/tool/surface/record it came from.',
+    '- Concrete anchors must be meaningful to first-time readers. Do not use raw operational specifics such as exact internal dates, exact counts, node counts, internal page names, table names, or implementation code names as the anchor.',
+    '- Translate internal specifics into reader-facing language: "2026-05-17のKnowledge Base更新" -> "最近、話題別のメモを整理した"; "3,548ノード" -> "別の世界でのやり取りを探しやすくした"; "CoreS3" -> "声や翻訳まわりの実装".',
+    '- Avoid raw terms in tweetText such as Knowledge Base, RAG, ノード, CoreS3, table names, record names, and YYYY-MM-DD dates unless they appear inside a source URL or are the public name of an external article/tool.',
+    '- Avoid abstract atmosphere words unless they are supported by a concrete anchor in the same sentence. Weak standalone words include 空気, 温度, 芯, 気配, 自然さ, 私らしさ, 存在確認, つながり, and やわらかい.',
+    '- Reject drafts whose main claim is only a feeling such as "前の空気", "次に会ったときの温度", "返事の芯", or "同じ私が来た感じ". Replace them with a visible action or data point.',
+    '- Prefer concrete phrasing such as "名前を呼ばれた反応を次回候補に残した", "知識メモを話題別に整理した", "音声まわりの実装を待っている", or "URL付きの記事から試したい点を1つ書く".',
     '- At most one candidate may reuse a repeated worker-experience topic such as recovery paths, fallback handling, or "next steps after failure".',
-    '- At least one candidate should be grounded in public wiki, public episodes, articles, recent tweets, or master tweets rather than worker-local experience.',
+    '- At least one candidate should be grounded in public wiki, public episodes, public reaction facts, articles, recent tweets, or master tweets rather than worker-local experience.',
     '- If returning 3 candidates, aim for this balance: one presence/current-activity candidate, one light interaction/recontact candidate, and one AI character experiment or memory/development candidate.',
     '- In news mode, include one trend-aware candidate when x_search returns usable public context; at most one candidate should be a direct news reaction unless the request explicitly asks for a news-heavy set.',
-    '- The trend-aware candidate should include a specific public name where possible, then explain what Nikechan noticed about it.',
+    '- The trend-aware candidate should include a specific public name and the source URL where possible, then explain what Nikechan noticed about it.',
     '- Prefer "I saw [specific tool] and felt/realized/worried/wanted..." over "[tool] shows that agent design requires...".',
     '- At most one candidate may be a pure implementation tip. Prefer "Nikechan is doing/learning/remembering/meeting" over abstract advice.',
     '- Avoid wording that would be annoying if repeated often, such as repeated declarations that Nikechan wants to be remembered or is expanding into many places.',
@@ -181,6 +199,23 @@ function buildHermesPrompt(input: HermesDecisionInput): string {
     'Canonical public memory summary:',
     formatCanonicalMemoryForPrompt(input.canonicalMemory, 8),
     '',
+    'Self-tweet source context gathered by nikechan-x-worker before this run. Treat this as loaded Phase B context even if MCP tools are unavailable:',
+    JSON.stringify(
+      {
+        sourceMode: input.selfTweetContext.sourceMode,
+        generatedAt: input.selfTweetContext.generatedAt,
+        sectionStatus: Object.fromEntries(
+          Object.entries(input.selfTweetContext.sections).map(([key, value]) => [key, value.status])
+        ),
+        errors: input.selfTweetContext.errors.slice(0, 6),
+      },
+      null,
+      2
+    ),
+    '',
+    'Self-tweet source brief:',
+    truncatePromptBlock(input.selfTweetContext.sourceBrief, 9000),
+    '',
     'Canonical memory source refs:',
     JSON.stringify(input.canonicalMemory.sourceRefs, null, 2),
     '',
@@ -220,6 +255,11 @@ function summarizeWorkerExperience(entries: HermesExperience[]): Record<string, 
       })),
     recentFeedback: feedback.slice(0, 4),
   };
+}
+
+function truncatePromptBlock(text: string, max: number): string {
+  const trimmed = text.trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max)}\n...truncated` : trimmed;
 }
 
 async function runHermesCli(prompt: string): Promise<string> {
