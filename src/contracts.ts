@@ -110,6 +110,8 @@ export interface WorkflowReportAudit {
   hermesSkill?: HermesSkillAudit;
   canonicalMemory: 'loaded' | 'disabled' | 'unavailable';
   canonicalMemoryErrors?: string[];
+  sourceMode?: string;
+  requestedSourceMode?: string;
   correlationId?: string;
   auditId?: string;
   policyVersion: string;

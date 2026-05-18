@@ -50,6 +50,8 @@ These tools are the intended Phase B bridge: Hermes gathers and reasons over X w
 
 Source mode rotation includes `presence`, `daily_life`, `tech`, `news`, `memory`, and `random`. In `news` mode, Hermes should use its `x_search` tool when available to gather current public topics around AI, AI agents, AI characters, AITuber/VTuber tooling, LLMs, and AI coding assistants. If xAI credentials are unavailable, Hermes must fall back to loaded articles/public memory and avoid claiming current news.
 
+xangi may override the source mode for a single Discord-triggered run by sending `WorkflowRequest.context.sourceMode`, for example from `/self-tweet news`. This per-request override takes precedence over automatic rotation and the legacy `SELF_TWEET_SOURCE_MODE` environment variable.
+
 Source modes are editorial lanes, not different personas. Keep Nikechan's presence design consistent, but avoid letting every mode collapse into the same materials:
 
 - `presence`: public reactions, name mentions, recontact, being found, relationship signals.

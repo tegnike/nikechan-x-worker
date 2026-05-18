@@ -441,6 +441,8 @@ esac
   });
 
   it('rotates self-tweet source mode from old xangi run-state semantics', () => {
+    expect(chooseSourceMode({ mode: 'daily_life' }, 'news')).toBe('news');
+    expect(chooseSourceMode({ mode: 'daily_life' }, 'presence')).toBe('presence');
     expect(chooseSourceMode({ mode: 'daily_life' })).toBe('tech');
     expect(chooseSourceMode({ mode: 'tech' })).toBe('news');
     expect(chooseSourceMode({ mode: 'news' })).toBe('memory');
@@ -459,6 +461,24 @@ esac
     expect(context.sections.grokTrendPlan.status).toBe('loaded');
     expect(JSON.stringify(context.sections.grokTrendPlan.data)).toContain('AI agents');
     expect(context.sourceBrief).toContain('Grok/X検索方針');
+  });
+
+  it('uses request context source mode before automatic rotation', async () => {
+    process.env.NIKECHAN_DB_SH_PATH = join(process.cwd(), 'tests/fixtures/db.sh');
+
+    const report = await runWorkflow({
+      workflow: 'self-tweet',
+      surface: 'x',
+      mode: 'dry-run',
+      requested_by: 'xangi',
+      correlation_id: 'source-mode-context',
+      constraints: { require_approval: true, max_actions: 1 },
+      context: { sourceMode: 'news' },
+    });
+
+    expect(report.audit.sourceMode).toBe('news');
+    expect(report.audit.requestedSourceMode).toBe('news');
+    expect(report.actions[0]?.metadata?.source_mode).toBe('news');
   });
 
   it('collects non-X web article candidates for news source mode', async () => {

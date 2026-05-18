@@ -63,6 +63,13 @@ echo '{"workflow":"self-tweet","surface":"x","mode":"dry-run","requested_by":"xa
 
 By default the worker requires the real Hermes CLI. Set `NIKECHAN_X_WORKER_HERMES_MODE=local-fallback` only for scaffold tests where Hermes is not installed.
 
+To force a source lane for one run, pass `context.sourceMode`:
+
+```bash
+echo '{"workflow":"self-tweet","surface":"x","mode":"dry-run","requested_by":"xangi","correlation_id":"local-test-news","constraints":{"require_approval":true,"max_actions":3},"context":{"sourceMode":"news"}}' \
+  | node dist/cli.js run
+```
+
 For Phase B runs, register the worker MCP server once and enable the dedicated MCP server toolset:
 
 ```bash
@@ -159,6 +166,7 @@ Set `NIKECHAN_X_WORKER_CANONICAL_MEMORY=disabled` for isolated local tests.
 
 - presence design: X is a contact/recontact surface for an AI character whose memory, relationships, and activity range grow over time
 - source mode rotation: `presence`, `daily_life`, `tech`, `news`, `memory`, `random`
+- per-request source mode override through `WorkflowRequest.context.sourceMode`
 - used topics and recent presented-topic cooldown
 - recent Nikechan X posts where available
 - public presence digests and aggregate presence signal summaries

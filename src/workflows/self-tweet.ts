@@ -21,9 +21,10 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
   const memory = new HermesMemoryStore();
   const agent = createHermesRuntime();
   const killSwitch = readKillSwitchState();
+  const requestedSourceMode = request.context?.sourceMode ?? request.context?.source_mode;
   const [canonicalMemory, selfTweetContext] = await Promise.all([
     collectSelfTweetCanonicalMemory(),
-    collectSelfTweetToolContext(),
+    collectSelfTweetToolContext({ requestedSourceMode }),
   ]);
   const skill = loadSelfTweetSkill();
   const hermesSkillBefore = readHermesSelfTweetSkillSnapshot();
@@ -109,6 +110,7 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
       metadata: {
         topic: entry.candidate.topic,
         hermes_reasoning: entry.candidate.reasoning,
+        source_mode: selfTweetContext.sourceMode,
         memory_refs: decision.memoryRefs,
       },
     })),
@@ -130,6 +132,8 @@ export async function runSelfTweetWorkflow(request: WorkflowRequest): Promise<Wo
       hermesSkill: hermesSkillAudit,
       canonicalMemory: canonicalMemory.status,
       canonicalMemoryErrors: canonicalMemory.errors.length ? canonicalMemory.errors : undefined,
+      sourceMode: selfTweetContext.sourceMode,
+      requestedSourceMode: typeof requestedSourceMode === 'string' ? requestedSourceMode : undefined,
       correlationId: request.correlation_id,
       policyVersion: POLICY_VERSION,
     },

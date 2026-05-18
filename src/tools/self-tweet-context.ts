@@ -57,12 +57,14 @@ export interface SelfTweetToolContext {
   errors: string[];
 }
 
-export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContext> {
+export async function collectSelfTweetToolContext(
+  options: { requestedSourceMode?: unknown } = {}
+): Promise<SelfTweetToolContext> {
   const [lastSourceModeState, presentedTopicCooldown] = await Promise.all([
     getTwitterRunStateValue('self_tweet_last_source_mode'),
     getRecentPresentedTopicCooldown(),
   ]);
-  const sourceMode = chooseSourceMode(lastSourceModeState);
+  const sourceMode = chooseSourceMode(lastSourceModeState, options.requestedSourceMode);
 
   const [
     presenceDigests,
@@ -134,7 +136,12 @@ export async function collectSelfTweetToolContext(): Promise<SelfTweetToolContex
   };
 }
 
-export function chooseSourceMode(state: Record<string, unknown> | null): SelfTweetSourceMode {
+export function chooseSourceMode(
+  state: Record<string, unknown> | null,
+  requestedSourceMode?: unknown
+): SelfTweetSourceMode {
+  const requested = normalizeSourceMode(requestedSourceMode);
+  if (requested) return requested;
   const requestedMode = process.env.SELF_TWEET_SOURCE_MODE;
   if (SOURCE_MODES.some((mode) => mode === requestedMode)) return requestedMode as SelfTweetSourceMode;
   const lastMode = typeof state?.mode === 'string' ? state.mode : '';
@@ -142,6 +149,12 @@ export function chooseSourceMode(state: Record<string, unknown> | null): SelfTwe
   if (lastIndex >= 0) return SOURCE_MODES[(lastIndex + 1) % SOURCE_MODES.length];
   const nowHour = new Date().getUTCHours();
   return SOURCE_MODES[nowHour % SOURCE_MODES.length];
+}
+
+function normalizeSourceMode(input: unknown): SelfTweetSourceMode | null {
+  if (typeof input !== 'string') return null;
+  const normalized = input.trim();
+  return SOURCE_MODES.some((mode) => mode === normalized) ? (normalized as SelfTweetSourceMode) : null;
 }
 
 async function safePresenceDigests(limit: number): Promise<ToolReadResult> {
